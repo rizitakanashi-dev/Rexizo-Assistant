@@ -21,7 +21,17 @@ logger = logging.getLogger(__name__)
 STATUS_ONLINE = "online"
 STATUS_OFFLINE = "offline"
 STATUS_CONNECTING = "connecting"
+STATUS_RECONNECTING = "reconnecting"
 STATUS_ERROR = "error"
+
+#: Kosakata status kamera yang sah (dipakai validasi di lapisan atas).
+CAMERA_STATUSES: tuple[str, ...] = (
+    STATUS_ONLINE,
+    STATUS_OFFLINE,
+    STATUS_CONNECTING,
+    STATUS_RECONNECTING,
+    STATUS_ERROR,
+)
 
 
 class StatusCallback(Protocol):
@@ -62,6 +72,7 @@ class SurveillanceWorker:
         self._latest_frame: np.ndarray | None = None
         self._lock = threading.Lock()
         self._status: str = ""
+        self._ever_online: bool = False
         self._last_notify: float = time.monotonic()
 
     @property
@@ -102,6 +113,8 @@ class SurveillanceWorker:
             return
         self._status = status
         self._last_notify = now
+        if status == STATUS_ONLINE:
+            self._ever_online = True
         try:
             self._on_status(self._camera.id, status, fps, reason)
         except Exception as exc:  # pragma: no cover - defensive
@@ -121,7 +134,11 @@ class SurveillanceWorker:
     def _process_once(self) -> None:
         ok, frame = self._source.read()
         if not ok or frame is None:
-            self._set_status(STATUS_CONNECTING, reason="stream tidak tersedia")
+            # Kamera yang belum pernah online masih dalam proses sambung pertama
+            # (`connecting`); kamera yang sudah online berarti stream terputus dan
+            # perlu disambung kembali (`reconnecting`).
+            status = STATUS_RECONNECTING if self._ever_online else STATUS_CONNECTING
+            self._set_status(status, reason="stream tidak tersedia")
             self._stop_event.wait(self._loop_interval)
             return
         with self._lock:

@@ -46,7 +46,7 @@ export function ChatPanel() {
     try {
       await send.mutateAsync({ message: text, client_message_id: clientId })
       setClientId(newId())
-    } catch (e: any) {
+    } catch {
       // keep input? per rules we just show error via status; easier to restore
       setInput(text)
     }

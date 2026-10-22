@@ -22,6 +22,7 @@ def _to_item(event) -> EventItem:
             metadata = json.loads(event.metadata_json)
         except json.JSONDecodeError:  # pragma: no cover - data rusak
             metadata = {}
+    snapshot_url = f"/api/v1/events/{event.id}/snapshot" if event.snapshot_path else None
     return EventItem(
         id=event.id,
         camera_id=event.camera_id,
@@ -30,7 +31,8 @@ def _to_item(event) -> EventItem:
         timestamp=event.timestamp,
         confidence=event.confidence,
         metadata=metadata,
-        snapshot_path=f"/api/v1/events/{event.id}/snapshot" if event.snapshot_path else None,
+        snapshot_path=snapshot_url,
+        snapshot_url=snapshot_url,
         is_mock=event.is_mock,
     )
 

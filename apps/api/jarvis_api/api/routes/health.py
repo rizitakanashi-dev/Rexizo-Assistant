@@ -17,12 +17,21 @@ router = APIRouter(tags=["system"])
 _STARTED_AT = time.monotonic()
 
 
+def _ai_state(settings: SettingsDep) -> str:
+    if not settings.ai_enabled:
+        return "disabled"
+    if settings.llm_enabled:
+        return "available"
+    if settings.test_mode:
+        return "not_configured"
+    return "unavailable"
+
+
 @router.get("/health", response_model=HealthResponse, dependencies=[ApiKeyDep])
 async def health(settings: SettingsDep) -> HealthResponse:
     """Status kesehatan sistem dan komponennya."""
-    llm_status = (
-        "available" if settings.llm_enabled else ("mock" if settings.test_mode else "unavailable")
-    )
+    llm_status = _ai_state(settings)
+    mock_mode = bool(settings.mock_camera_feed or settings.test_mode)
     return HealthResponse(
         status="healthy",
         version=settings.version,
@@ -32,6 +41,7 @@ async def health(settings: SettingsDep) -> HealthResponse:
             "surveillance_workers": "running",
             "llm_service": llm_status,
         },
+        mock_mode=mock_mode,
     )
 
 
@@ -54,6 +64,7 @@ async def system_status(session: SessionDep, settings: SettingsDep) -> SystemSta
             "provider": settings.llm_provider_name,
             "model": settings.dattio_model,
             "degraded": not settings.llm_enabled,
+            "state": _ai_state(settings),
             "tool_mode": settings.dattio_tool_mode,
         },
     )

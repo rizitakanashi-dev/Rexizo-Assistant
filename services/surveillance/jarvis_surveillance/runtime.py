@@ -17,7 +17,7 @@ from .models import CameraSpec, SurveillanceEvent
 from .motion import MotionDetector
 from .pipeline import EventPipeline
 from .storage import SnapshotStore
-from .worker import SurveillanceWorker
+from .worker import CAMERA_STATUSES, SurveillanceWorker
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,8 @@ class SurveillanceRuntime:
     def _on_status(
         self, camera_id: str, status: str, fps: float | None = None, reason: str | None = None
     ) -> None:
+        if status not in CAMERA_STATUSES:
+            logger.warning("Status kamera %s di luar kosakata: %s", camera_id, status)
         logger.info("Status kamera %s -> %s (fps=%s) %s", camera_id, status, fps, reason or "")
         self.statuses.put((camera_id, status, fps, reason))
 

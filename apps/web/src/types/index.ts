@@ -1,4 +1,4 @@
-export type CameraStatus = 'online' | 'offline' | 'connecting' | 'error'
+export type CameraStatus = 'online' | 'offline' | 'connecting' | 'reconnecting' | 'error'
 export type EventType = 'motion' | 'object_detected' | 'camera_status' | (string & {})
 
 export interface Camera {
@@ -6,10 +6,12 @@ export interface Camera {
   name: string
   is_enabled: boolean
   status: CameraStatus
-  fps: number
+  fps: number | null
   last_seen_at: string | null
   stream_url_preview: string | null
   snapshot_url: string | null
+  /** true bila kamera memakai feed sintetis (mock), bukan RTSP sungguhan. */
+  is_mock: boolean
 }
 
 export interface EventItem {
@@ -21,6 +23,8 @@ export interface EventItem {
   confidence: number | null
   metadata: Record<string, unknown>
   snapshot_path: string | null
+  /** Alias dari `snapshot_path` dengan isi identik (ruling C-8). */
+  snapshot_url: string | null
   is_mock: boolean
 }
 
@@ -31,7 +35,14 @@ export interface EventPage {
   items: EventItem[]
 }
 
-export type ToolExecStatus = 'ok' | 'error' | 'denied' | string
+export type ToolExecStatus =
+  | 'success'
+  | 'error'
+  | 'denied'
+  | 'invalid_arguments'
+  | 'timeout'
+  | 'ok'
+  | (string & {})
 
 export interface ToolExecution {
   name?: string
@@ -89,13 +100,24 @@ export interface HealthResponse {
   version: string
   uptime_seconds: number
   components: HealthComponents
+  /** true bila sistem berjalan memakai data/feed sintetis (ruling C-9). */
+  mock_mode: boolean
 }
+
+export type AiState =
+  | 'available'
+  | 'degraded'
+  | 'unavailable'
+  | 'not_configured'
+  | 'disabled'
 
 export interface AiStatus {
   enabled: boolean
   provider: string
   model?: string | null
   degraded: boolean
+  /** Status AI kanonik — otoritatif bila backend mengirimnya (ruling G-7). */
+  state: AiState
   tool_mode?: string
 }
 

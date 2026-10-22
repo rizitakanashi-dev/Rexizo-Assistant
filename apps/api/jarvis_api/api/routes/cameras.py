@@ -28,6 +28,7 @@ def _to_schema(camera) -> CameraStatus:
         last_seen_at=camera.last_seen_at,
         stream_url_preview=f"/api/v1/cameras/{camera.id}/stream",
         snapshot_url=f"/api/v1/cameras/{camera.id}/snapshot",
+        is_mock=bool(camera.is_mock),
     )
 
 

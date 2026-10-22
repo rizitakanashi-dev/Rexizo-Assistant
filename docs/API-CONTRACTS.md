@@ -24,8 +24,9 @@ Mengembalikan status kesehatan sistem dan komponen.
   "components": {
     "database": "connected",
     "surveillance_workers": "running",
-    "llm_service": "available"
-  }
+    "llm_service": "available" // "available" | "degraded" | "unavailable" | "not_configured" | "disabled"
+  },
+  "mock_mode": false
 }
 ```
 
@@ -44,11 +45,12 @@ Ringkasan metrik sistem lokal (CPU, Memory, Storage snapshot, kamera terdaftar).
     "provider": "dattio",
     "model": "dattio-model",
     "degraded": false,
+    "state": "available", // "available" | "degraded" | "unavailable" | "not_configured" | "disabled"
     "tool_mode": "auto"
   }
 }
 ```
-`ai.degraded=true` berarti AI berjalan tanpa provider nyata (mode offline/FakeProvider).
+`ai.degraded=true` berarti AI berjalan tanpa provider nyata (mode offline/FakeProvider). `ai.state` adalah enum kanonik status AI.
 
 ---
 
@@ -61,11 +63,12 @@ Mendapatkan daftar semua kamera yang dikonfigurasi.
     "id": "cam_front_door",
     "name": "Front Door",
     "is_enabled": true,
-    "status": "online", // "online" | "offline" | "connecting" | "error"
+    "status": "online", // "online" | "offline" | "connecting" | "reconnecting" | "error"
     "fps": 15.0,
     "last_seen_at": "2026-10-22T06:00:00Z",
     "stream_url_preview": "/api/v1/cameras/cam_front_door/stream",
-    "snapshot_url": "/api/v1/cameras/cam_front_door/snapshot"
+    "snapshot_url": "/api/v1/cameras/cam_front_door/snapshot",
+    "is_mock": false
   }
 ]
 ```
@@ -123,6 +126,7 @@ Query log event dengan filter.
         "motion_area_percent": 14.5
       },
       "snapshot_path": "/api/v1/events/evt_98741/snapshot",
+      "snapshot_url": "/api/v1/events/evt_98741/snapshot",
       "is_mock": false
     }
   ]
@@ -220,7 +224,10 @@ Kode: `AI_DISABLED`, `AI_INVALID_REQUEST`, `AI_PROVIDER_ERROR`, `AI_RATE_LIMITED
 ### 2.5 Real-Time WebSocket
 #### `WS /ws/events`
 Koneksi WebSocket dua arah untuk update event real-time ke UI.
-- Pesan masuk (dari server ke client):
+- **Autentikasi (C-5)**: Query parameter `?api_key=` atau Header `X-JARVIS-API-KEY`. Bila server berjalan tanpa API key, hanya loopback host yang diizinkan; koneksi tidak terotorisasi ditutup dengan kode `1008`.
+- **Catch-Up (C-10)**: Query parameter `?since=<ISO8601>` mengirim event riwayat setelah timestamp tersebut secara urut (asc) sebelum beralih ke streaming live.
+- **Payload Event**:
+  1. `NEW_EVENT`:
 ```json
 {
   "event": "NEW_EVENT",
@@ -234,6 +241,20 @@ Koneksi WebSocket dua arah untuk update event real-time ke UI.
       "motion_area_percent": 8.2
     },
     "snapshot_url": "/api/v1/events/evt_98742/snapshot",
+    "is_mock": false
+  }
+}
+```
+  2. `CAMERA_STATUS`:
+```json
+{
+  "event": "CAMERA_STATUS",
+  "data": {
+    "camera_id": "cam_front_door",
+    "name": "Front Door",
+    "status": "online", // "online" | "offline" | "connecting" | "reconnecting" | "error"
+    "fps": 15.0,
+    "last_seen_at": "2026-10-22T06:01:00Z",
     "is_mock": false
   }
 }

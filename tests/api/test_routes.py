@@ -15,7 +15,8 @@ def test_health_endpoint(client: TestClient) -> None:
     assert payload["status"] == "healthy"
     assert payload["version"] == "0.1.0-mvp"
     assert "database" in payload["components"]
-    assert payload["components"]["llm_service"] == "mock"
+    assert payload["components"]["llm_service"] == "not_configured"
+    assert payload["mock_mode"] is True
 
 
 def test_system_status_endpoint(client: TestClient) -> None:
@@ -26,6 +27,8 @@ def test_system_status_endpoint(client: TestClient) -> None:
     assert payload["active_cameras"] == 0
     assert payload["events_today"] == 0
     assert "cpu_usage_percent" in payload
+    assert payload["ai"]["state"] == "not_configured"
+    assert payload["ai"]["degraded"] is True
 
 
 def test_camera_crud_never_exposes_rtsp_url(client: TestClient) -> None:

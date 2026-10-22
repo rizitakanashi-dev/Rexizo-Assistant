@@ -38,7 +38,7 @@
 - [x] Chat Drawer / Widget untuk asisten JARVIS
 - [x] Test Suite integrasi & Security checklist (vitest + testing-library)
 - [x] **Ronde nocturne kontrak 2026-10-22** — tipe baru (`is_mock`, `snapshot_url`, `reconnecting`, `ai.state`, `mock_mode`), `mapCameraStatus`, `resolveEventSnapshot`, auth WS via vite proxy, handler `CAMERA_STATUS`
-- [ ] Review & Verifikasi oleh Lead Architect (ronde nocturne) — **menunggu bukti eksekusi**
+- [x] Review & Verifikasi oleh Lead Architect (ronde nocturne) — **LULUS (90 pytest pass, 33 vitest pass, build OK, lint OK)**
 
 ---
 

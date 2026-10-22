@@ -34,6 +34,7 @@ from .tools import (
     ToolNotFoundError,
     ToolPermissionError,
     ToolRegistry,
+    ToolValidationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -332,12 +333,36 @@ class ChatService:
         self, call: Any, context: ToolContext
     ) -> tuple[dict[str, Any], ToolExecution]:
         try:
-            result = await self._registry.execute(
-                call.name, call.arguments, context, allow_mutating=False
+            result = await asyncio.wait_for(
+                self._registry.execute(call.name, call.arguments, context, allow_mutating=False),
+                timeout=5.0,
+            )
+        except TimeoutError:
+            logger.warning("Tool '%s' timeout (>5s)", call.name)
+            status = "timeout"
+            msg = f"Tool '{call.name}' melebihi batas waktu eksekusi (5 detik)"
+            content = json.dumps({"error": msg}, ensure_ascii=False)
+            return (
+                {"role": "tool", "tool_call_id": call.id, "name": call.name, "content": content},
+                ToolExecution(
+                    name=call.name,
+                    tool_name=call.name,
+                    status=status,
+                    duration_ms=5000,
+                    parameters=call.arguments or {},
+                    result=None,
+                    result_summary=f"timeout: {msg}",
+                    error=msg,
+                ),
             )
         except ToolError as exc:
             logger.warning("Tool '%s' gagal: %s", call.name, exc)
-            status = "denied" if _is_denied(exc) else "error"
+            if isinstance(exc, ToolValidationError):
+                status = "invalid_arguments"
+            elif _is_denied(exc):
+                status = "denied"
+            else:
+                status = "error"
             content = json.dumps({"error": str(exc)}, ensure_ascii=False)
             return (
                 {"role": "tool", "tool_call_id": call.id, "name": call.name, "content": content},

@@ -3,6 +3,10 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.*
+!.env.example
+*.pem
+*.key
 *.db
 *.db-journal
 storage/snapshots/*

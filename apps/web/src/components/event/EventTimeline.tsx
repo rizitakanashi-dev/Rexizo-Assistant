@@ -10,6 +10,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { EventItem } from '@/types'
+import { resolveEventSnapshot } from '@/utils/contract'
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   motion: 'Gerak',
@@ -35,6 +36,8 @@ function EventCard({ ev }: { ev: EventItem }) {
   })()
 
   const metaEntries = Object.entries(ev.metadata ?? {}).filter(([, v]) => v !== null && v !== undefined)
+  // `snapshot_url` (ruling C-8) lebih didahulukan; `snapshot_path` jadi fallback.
+  const snapshotUrl = resolveEventSnapshot(ev)
 
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -51,7 +54,7 @@ function EventCard({ ev }: { ev: EventItem }) {
             variant="outlined"
           />
         )}
-        {ev.snapshot_path && (
+        {snapshotUrl && (
           <Chip label="Ada snapshot" size="small" color="default" variant="outlined" />
         )}
       </Box>

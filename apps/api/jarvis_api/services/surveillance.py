@@ -146,8 +146,29 @@ class SurveillanceService:
                 return
             camera_id, camera_status, fps, reason = status
             try:
+                cam = None
                 async with self._database.session() as session:
-                    await CameraRepository(session).set_status(camera_id, camera_status, fps)
+                    cam = await CameraRepository(session).set_status(camera_id, camera_status, fps)
+                name = cam.name if cam else camera_id
+                last_seen = (
+                    cam.last_seen_at.isoformat().replace("+00:00", "Z")
+                    if cam and cam.last_seen_at
+                    else None
+                )
+                is_mock = cam.is_mock if cam else False
+                await self._broadcaster.broadcast(
+                    {
+                        "event": "CAMERA_STATUS",
+                        "data": {
+                            "camera_id": camera_id,
+                            "name": name,
+                            "status": camera_status,
+                            "fps": fps,
+                            "last_seen_at": last_seen,
+                            "is_mock": is_mock,
+                        },
+                    }
+                )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:

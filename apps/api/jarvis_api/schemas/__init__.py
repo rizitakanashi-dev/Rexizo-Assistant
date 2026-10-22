@@ -14,11 +14,12 @@ class CameraStatus(BaseModel):
     id: str
     name: str
     is_enabled: bool
-    status: str = Field(description="online | offline | connecting | error")
+    status: str = Field(description="online | offline | connecting | reconnecting | error")
     fps: float | None = None
     last_seen_at: datetime | None = None
     stream_url_preview: str
     snapshot_url: str
+    is_mock: bool = False
 
 
 class CameraCreate(BaseModel):
@@ -38,6 +39,7 @@ class EventItem(BaseModel):
     confidence: float | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     snapshot_path: str | None = None
+    snapshot_url: str | None = None
     is_mock: bool = False
 
 
@@ -64,7 +66,10 @@ class ToolExecution(BaseModel):
 
     name: str
     tool_name: str
-    status: str = Field(default="ok", description="ok | error | denied")
+    status: str = Field(
+        default="ok",
+        description="ok | success | error | denied | invalid_arguments | timeout",
+    )
     duration_ms: int = 0
     parameters: dict[str, Any] = Field(default_factory=dict)
     result: Any | None = None
@@ -112,6 +117,7 @@ class HealthResponse(BaseModel):
     version: str
     uptime_seconds: float
     components: dict[str, str]
+    mock_mode: bool = False
 
 
 class SystemStatus(BaseModel):

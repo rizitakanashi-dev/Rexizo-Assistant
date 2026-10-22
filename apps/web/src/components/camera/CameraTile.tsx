@@ -2,11 +2,13 @@ import { Box, Card, CardContent, Chip, IconButton, Typography } from '@mui/mater
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { useEffect, useRef, useState } from 'react'
 import { Camera } from '@/types'
-import { resolveMediaPath } from '@/utils/contract'
+import { mapCameraStatus, resolveMediaPath } from '@/utils/contract'
 
 interface Props {
   camera: Camera
 }
+
+const OFFLINE_STATUSES = ['offline', 'error']
 
 export function CameraTile({ camera }: Props) {
   const imgRef = useRef<HTMLImageElement>(null)
@@ -15,13 +17,17 @@ export function CameraTile({ camera }: Props) {
   const streamSrc = camera.stream_url_preview ? resolveMediaPath(camera.stream_url_preview) : null
   const snapshotSrc = camera.snapshot_url ? resolveMediaPath(camera.snapshot_url) : null
 
+  const statusView = mapCameraStatus(camera.status)
+  const isOffline = OFFLINE_STATUSES.includes(camera.status)
+  const isReconnecting = camera.status === 'reconnecting'
+
   useEffect(() => {
     setStreamOk(true)
     setRetry(0)
   }, [camera.id])
 
   useEffect(() => {
-    if (camera.status === 'offline' || camera.status === 'error' || !camera.is_enabled) {
+    if (isOffline || !camera.is_enabled) {
       setStreamOk(false)
       return
     }
@@ -31,9 +37,10 @@ export function CameraTile({ camera }: Props) {
       if (el.naturalWidth === 0) setStreamOk(false)
     }, 2500)
     return () => clearTimeout(t)
-  }, [camera.status, camera.is_enabled, retry, streamSrc])
+  }, [camera.status, camera.is_enabled, retry, streamSrc, isOffline])
 
-  const showStream = camera.is_enabled && streamOk && camera.status !== 'offline' && camera.status !== 'error' && streamSrc
+  const showStream =
+    camera.is_enabled && streamOk && !isOffline && streamSrc
 
   return (
     <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -60,9 +67,19 @@ export function CameraTile({ camera }: Props) {
             <Chip label="Nonaktif" size="small" />
           </Box>
         )}
-        {(camera.status === 'offline' || camera.status === 'error') && camera.is_enabled && (
+        {isOffline && camera.is_enabled && (
           <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.5)' }}>
-            <Chip label="Offline" size="small" color="error" />
+            <Chip label={statusView.label} size="small" color={statusView.color} />
+          </Box>
+        )}
+        {isReconnecting && camera.is_enabled && (
+          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.45)' }}>
+            <Chip label={statusView.label} size="small" color={statusView.color} />
+          </Box>
+        )}
+        {camera.is_mock && (
+          <Box sx={{ position: 'absolute', top: 8, left: 8 }}>
+            <Chip label="[MOCK]" size="small" color="warning" variant="filled" />
           </Box>
         )}
       </Box>
@@ -71,9 +88,12 @@ export function CameraTile({ camera }: Props) {
           <Typography variant="subtitle2" noWrap>
             {camera.name}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {camera.status} · {camera.fps.toFixed(1)} fps
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Chip label={statusView.label} size="small" color={statusView.color} variant="outlined" />
+            <Typography variant="caption" color="text.secondary">
+              {camera.fps !== null && camera.fps !== undefined ? `${camera.fps.toFixed(1)} fps` : 'fps —'}
+            </Typography>
+          </Box>
         </Box>
         {!showStream && camera.is_enabled && (
           <IconButton size="small" onClick={() => setRetry((r) => r + 1)}>

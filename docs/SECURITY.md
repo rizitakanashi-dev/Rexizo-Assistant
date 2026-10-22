@@ -170,26 +170,17 @@ sederhana (`X-JARVIS-API-KEY: <key>`), default allow untuk localhost."*
 | Mekanisme | Endpoint | Verifikasi | Catatan |
 |---|---|---|---|
 | API key (header) | Semua REST | Header `X-JARVIS-API-KEY` cocok dengan nilai server | Disediakan oleh proxy; **tidak pernah** sampai ke browser |
-| WS | `WS /ws/events` | **Belum ada kontrak (`C-5`)** |_Opsi: cookie sesi (ideal), token query (bocor di log), atau same-origin tanpa token_ |
+| WS | `WS /ws/events` | Query `?api_key=` atau Header `X-JARVIS-API-KEY` (C-5 ditutup) | Loopback diizinkan jika API key kosong; gagal -> code 1008 |
 | Dashboard (human) | Reverse proxy | Basic Auth / TLS client cert / akses jaringan lokal | Lapisan kedua di luar API |
 
-### 5.2 Aturan untuk WebSocket (`C-5` — keputusan tertunda)
+### 5.2 Aturan untuk WebSocket (`C-5` — Ditutup)
 
-- **Kondisi aktual (2026-10-22):** `api/routes/websocket.py` **tidak** memakai `require_api_key`. REST memakai
-  `require_api_key` (hanya loopback bila tidak ada key). **WS terbuka bagi siapapun yang bisa terhubung** jika tidak
-  dibatasi jaringan.
-- **Default (sampai ada kontrak):** WS **hanya** boleh diakses dari `127.0.0.1` atau melalui tunnel lokal yang aman.
-  **Wajib** bind backend ke `127.0.0.1` di development (lihat `docs/DEPLOYMENT-LOCAL.md`).
-
-Yang **wajib** berlaku begitu keputusan diambil:
-
-1. **Tidak ada token di query string.** Query string masuk ke access log, proxy log, dan `Referer`. Bila token query
-   tidak bisa dihindari, harus minimal: TTL pendek + `Referrer-Policy: no-referrer` + scrubbing log proxy.
-2. **Pilihan utama: cookie sesi `HttpOnly` + `SameSite=Strict`.** Browser mengirimnya otomatis pada handshake WS
-   same-origin, dan JS tidak bisa membacanya → kebocoran XSS tidak berlaku.
-3. **Validasi `Origin` pada handshake WS.** Header `Origin` wajib sama dengan origin yang diizinkan; request tanpa
-   `Origin` (non-browser) ditolak. Ini mencegah cross-site WebSocket hijacking (CSWSH).
-4. **Query-string fallback hanya untuk non-browser client** (mis. CLI/monitor), dengan token berumur pendek.
+- **Keputusan Ruling 2026-10-22 (C-5):**
+  WebSocket `/ws/events` memvalidasi autentikasi sebelum koneksi diterima (`accept()`):
+  1. Memeriksa `api_key` dari query string `?api_key=` atau header `X-JARVIS-API-KEY`.
+  2. Bila `settings.api_key` terisi: wajib cocok via perbandingan waktu-konstan (`hmac.compare_digest`), selain itu ditutup dengan kode `1008` (Policy Violation).
+  3. Bila `settings.api_key` kosong: hanya host loopback (`127.0.0.1`, `::1`, `localhost`, `testclient`) yang diizinkan; host eksternal ditutup dengan kode `1008`.
+  4. Dev-proxy Vite menyuntikkan header di sisi proxy sehingga browser klien tidak perlu menyimpan secret di frontend.
 
 ### 5.2b Kosakata status layanan (harus sama antara `/health` dan UI)
 

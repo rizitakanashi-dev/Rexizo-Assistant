@@ -13,7 +13,11 @@ from jarvis_surveillance.models import CameraSpec
 from jarvis_surveillance.motion import MotionDetector
 from jarvis_surveillance.pipeline import EventPipeline
 from jarvis_surveillance.storage import SnapshotStore
-from jarvis_surveillance.worker import SurveillanceWorker
+from jarvis_surveillance.worker import (
+    CAMERA_STATUSES,
+    STATUS_RECONNECTING,
+    SurveillanceWorker,
+)
 
 
 def _camera() -> CameraSpec:
@@ -110,6 +114,117 @@ def test_worker_marks_camera_connecting_when_stream_unavailable(tmp_path) -> Non
     worker.stop()
 
     assert "connecting" in statuses
+    assert STATUS_RECONNECTING not in statuses
+    assert worker.status == "connecting"
+
+
+def test_worker_reports_reconnecting_after_losing_online_stream(tmp_path) -> None:
+    """Kamera yang pernah online lalu stream-nya putus → status `reconnecting`."""
+
+    class FlakyFrameSource:
+        """Frame source palsu: menghasilkan frame saat `online`, stream putus saat tidak."""
+
+        def __init__(self, width: int = 160, height: int = 120) -> None:
+            self.online = True
+            self._frame = np.zeros((height, width, 3), dtype=np.uint8)
+
+        def read(self):
+            if not self.online:
+                return False, None
+            return True, self._frame
+
+        def release(self) -> None:
+            return None
+
+    store = SnapshotStore(tmp_path)
+    camera = _camera()
+    statuses: list[str] = []
+    source = FlakyFrameSource()
+
+    worker = SurveillanceWorker(
+        camera=camera,
+        source=source,
+        pipeline=EventPipeline(camera, store),
+        motion_detector=MotionDetector(),
+        object_detector=NullObjectDetector(),
+        on_event=lambda event: None,
+        on_status=lambda camera_id, status, fps=None, reason=None: statuses.append(status),
+    )
+    worker.start()
+
+    deadline = time.monotonic() + 5
+    while "online" not in statuses and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert "online" in statuses, "kamera harus pernah online dulu"
+
+    source.online = False
+    deadline = time.monotonic() + 5
+    while STATUS_RECONNECTING not in statuses and time.monotonic() < deadline:
+        time.sleep(0.05)
+    worker.stop()
+
+    assert STATUS_RECONNECTING in statuses
+    assert statuses.index("online") < statuses.index(STATUS_RECONNECTING), (
+        "`reconnecting` tidak boleh muncul sebelum kamera pernah online"
+    )
+
+
+def test_worker_returns_to_online_after_reconnect(tmp_path) -> None:
+    """Setelah `reconnecting`, stream yang pulih harus mengembalikan status `online`."""
+
+    class FlakyFrameSource:
+        def __init__(self, width: int = 160, height: int = 120) -> None:
+            self.online = True
+            self._frame = np.zeros((height, width, 3), dtype=np.uint8)
+
+        def read(self):
+            if not self.online:
+                return False, None
+            return True, self._frame
+
+        def release(self) -> None:
+            return None
+
+    store = SnapshotStore(tmp_path)
+    camera = _camera()
+    statuses: list[str] = []
+    source = FlakyFrameSource()
+
+    worker = SurveillanceWorker(
+        camera=camera,
+        source=source,
+        pipeline=EventPipeline(camera, store),
+        motion_detector=MotionDetector(),
+        object_detector=NullObjectDetector(),
+        on_event=lambda event: None,
+        on_status=lambda camera_id, status, fps=None, reason=None: statuses.append(status),
+    )
+    worker.start()
+
+    deadline = time.monotonic() + 5
+    while "online" not in statuses and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert "online" in statuses
+
+    source.online = False
+    deadline = time.monotonic() + 5
+    while STATUS_RECONNECTING not in statuses and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert STATUS_RECONNECTING in statuses
+
+    source.online = True
+    deadline = time.monotonic() + 5
+    while statuses.count("online") < 2 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    worker.stop()
+
+    assert statuses.count("online") >= 2, "status harus kembali online setelah reconnect"
+    assert worker.status == "online"
+
+
+def test_camera_status_vocabulary_contains_reconnecting() -> None:
+    assert STATUS_RECONNECTING in CAMERA_STATUSES
+    assert "reconnecting" in CAMERA_STATUSES
 
 
 def test_worker_accepts_latest_frame(tmp_path) -> None:

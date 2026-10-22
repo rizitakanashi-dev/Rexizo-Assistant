@@ -8,6 +8,22 @@ function fmtUptime(s: number) {
   return `${h}j ${m}m`
 }
 
+const AI_LABEL: Record<string, string> = {
+  available: 'AI siap',
+  degraded: 'AI menurun',
+  unavailable: 'AI mati',
+  not_configured: 'AI belum diatur',
+  disabled: 'AI dimatikan',
+}
+
+const AI_COLOR: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
+  available: 'success',
+  degraded: 'warning',
+  unavailable: 'error',
+  not_configured: 'default',
+  disabled: 'default',
+}
+
 export function StatusStrip() {
   const health = useHealth()
   const sys = useSystemStatus()
@@ -22,22 +38,9 @@ export function StatusStrip() {
   const active = sys.data?.active_cameras ?? 0
   const total = sys.data?.total_cameras ?? 0
   const eventsToday = sys.data?.events_today ?? 0
+  // `ai.state` backend bersifat otoritatif (ruling G-7); helperHandles fallback.
   const aiState = mapAiState(health.data, sys.data)
-
-  const aiLabel: Record<string, string> = {
-    available: 'AI siap',
-    degraded: 'AI menurun',
-    unavailable: 'AI mati',
-    not_configured: 'AI belum diatur',
-    disabled: 'AI dimatikan',
-  }
-  const aiColor: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
-    available: 'success',
-    degraded: 'warning',
-    unavailable: 'error',
-    not_configured: 'default',
-    disabled: 'default',
-  }
+  const mockMode = health.data?.mock_mode === true
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -67,7 +70,12 @@ export function StatusStrip() {
           Uptime {fmtUptime(sys.data.uptime_seconds)}
         </Typography>
       )}
-      <Chip size="small" label={aiLabel[aiState]} color={aiColor[aiState]} variant="outlined" />
+      <Chip size="small" label={AI_LABEL[aiState]} color={AI_COLOR[aiState]} variant="outlined" />
+      {mockMode && (
+        <Tooltip title="Mode data sintetis aktif">
+          <Chip size="small" label="MOCK" color="warning" variant="filled" />
+        </Tooltip>
+      )}
     </Box>
   )
 }

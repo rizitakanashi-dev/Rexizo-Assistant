@@ -29,6 +29,14 @@ export default defineConfig(({ mode }) => {
           target: 'ws://127.0.0.1:8000',
           ws: true,
           changeOrigin: true,
+          configure: (proxy) => {
+            // WebSocket memakai event `proxyReqWs` (bukan `proxyReq`).
+            // Browser tidak bisa mengirim header custom pada handshake WS,
+            // jadi API key disuntik di sisi dev-server — tidak pernah masuk bundle.
+            proxy.on('proxyReqWs', (proxyReq) => {
+              if (API_KEY) proxyReq.setHeader('X-JARVIS-API-KEY', API_KEY)
+            })
+          },
         },
       },
     },
