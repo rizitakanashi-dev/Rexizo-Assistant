@@ -50,15 +50,15 @@ class Settings(BaseSettings):
     # Prefix JARVIS_ tetap diterima sebagai alternatif.
     dattio_api_key: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("DATTIO_API_KEY", "JARVIS_DATTIO_API_KEY"),
+        validation_alias=AliasChoices("DATTIO_API_KEY", "JARVIS_DATTIO_API_KEY", "OPENROUTER_API_KEY"),
     )
     dattio_base_url: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("DATTIO_BASE_URL", "JARVIS_DATTIO_BASE_URL"),
+        validation_alias=AliasChoices("DATTIO_BASE_URL", "JARVIS_DATTIO_BASE_URL", "OPENROUTER_BASE_URL"),
     )
     dattio_model: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("DATTIO_MODEL", "JARVIS_DATTIO_MODEL"),
+        validation_alias=AliasChoices("DATTIO_MODEL", "JARVIS_DATTIO_MODEL", "OPENROUTER_MODEL"),
     )
     dattio_tool_mode: ToolMode = Field(
         default="auto",

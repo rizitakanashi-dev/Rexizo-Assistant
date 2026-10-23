@@ -88,7 +88,3 @@ cp .env.example .env          # isi DATTIO_API_KEY / DATTIO_BASE_URL / DATTIO_MO
 dan **tidak boleh** dipakai sebagai sumber kebenaran. Lihat [`docs/AUDIT.md` §3.1](docs/AUDIT.md) untuk detail dan
 rekomendasi penanganannya (menunggu keputusan Main Agent).
 
-## Next step
-
-Menunggu persetujuan Main Agent atas 7 celah kontrak di [`docs/AUDIT.md` §4](docs/AUDIT.md) sebelum implementasi
-dashboard dimulai.
