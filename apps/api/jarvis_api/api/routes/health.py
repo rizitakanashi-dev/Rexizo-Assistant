@@ -22,7 +22,7 @@ def _ai_state(settings: SettingsDep) -> str:
         return "disabled"
     if settings.llm_enabled:
         return "available"
-    if settings.test_mode:
+    if settings.test_mode or not settings.dattio_api_key:
         return "not_configured"
     return "unavailable"
 

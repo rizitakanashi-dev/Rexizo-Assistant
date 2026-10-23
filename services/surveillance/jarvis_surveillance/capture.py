@@ -34,7 +34,7 @@ class RtspFrameSource:
 
     def __init__(
         self,
-        url: str,
+        url: str | int,
         reconnect_delay_seconds: float = 3.0,
         max_reconnect_delay_seconds: float = 30.0,
     ) -> None:
@@ -45,15 +45,28 @@ class RtspFrameSource:
         self._delay = reconnect_delay_seconds
         self._next_attempt = 0.0
 
+    def _open_capture(self) -> cv2.VideoCapture:
+        target: str | int = self._url
+        if isinstance(target, str):
+            target_str = target.strip()
+            if target_str.isdigit():
+                target = int(target_str)
+            elif target_str.startswith("device://"):
+                dev_id = target_str.replace("device://", "").strip()
+                target = int(dev_id) if dev_id.isdigit() else dev_id
+            else:
+                target = target_str
+        return cv2.VideoCapture(target)
+
     def _ensure_capture(self) -> bool:
         if self._capture is not None and self._capture.isOpened():
             return True
         now = time.monotonic()
         if now < self._next_attempt:
             return False
-        self._capture = cv2.VideoCapture(self._url)
+        self._capture = self._open_capture()
         if not self._capture.isOpened():
-            logger.warning("Gagal membuka stream RTSP, mencoba lagi dalam %.1fs", self._delay)
+            logger.warning("Gagal membuka stream sumber (%s), mencoba lagi dalam %.1fs", self._url, self._delay)
             self._release_capture()
             self._delay = min(self._delay * 2, self._max_reconnect_delay)
             self._next_attempt = now + self._delay

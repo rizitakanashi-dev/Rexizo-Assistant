@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Card,
   CardContent,
@@ -20,8 +21,7 @@ import WifiIcon from '@mui/icons-material/Wifi'
 import WifiOffIcon from '@mui/icons-material/WifiOff'
 import SyncIcon from '@mui/icons-material/Sync'
 import { useEffect, useState } from 'react'
-import { useEvents } from '@/api/queries'
-import { useCameras } from '@/api/queries'
+import { useEvents, useCameras } from '@/api/queries'
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents'
 import { EventTimeline } from '@/components/event/EventTimeline'
 
@@ -45,50 +45,78 @@ export function EventsPage() {
   })
 
   // Reset to page 1 when new event arrives or filter changes
-  useEffect(() => { setPage(1) }, [latestEvent, eventType, cameraId, search])
+  useEffect(() => {
+    setPage(1)
+  }, [latestEvent, eventType, cameraId, search])
 
-  // totalPages used in TablePagination via count
   const errMsg = (error as Error | null)?.message
 
-  const WsIcon = wsState === 'connected'
-    ? WifiIcon
-    : wsState === 'reconnecting'
-    ? SyncIcon
-    : WifiOffIcon
-
-  const wsColor: 'success' | 'warning' | 'error' =
-    wsState === 'connected' ? 'success' : wsState === 'reconnecting' ? 'warning' : 'error'
+  const WsIcon =
+    wsState === 'connected' ? WifiIcon : wsState === 'reconnecting' ? SyncIcon : WifiOffIcon
 
   const wsLabel =
-    wsState === 'connected' ? 'Realtime aktif' :
-    wsState === 'reconnecting' ? 'Menghubungkan ulang…' :
-    wsState === 'connecting' ? 'Menghubungkan…' : 'Realtime terputus'
+    wsState === 'connected'
+      ? 'Realtime aktif'
+      : wsState === 'reconnecting'
+      ? 'Menghubungkan ulang…'
+      : wsState === 'connecting'
+      ? 'Menghubungkan…'
+      : 'Realtime terputus'
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        <Typography variant="h5" sx={{ fontWeight: 600, flex: 1 }}>
-          Timeline Event
-        </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, color: '#0d0d0d', fontSize: '22px' }}>
+            Timeline Event
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#5d5d5d', mt: 0.5 }}>
+            Log kronologis deteksi gerak dan deteksi objek dari seluruh kamera.
+          </Typography>
+        </Box>
         <Tooltip title={wsLabel}>
           <Chip
-            icon={<WsIcon fontSize="small" />}
+            icon={<WsIcon sx={{ fontSize: '14px !important', color: '#0d0d0d !important' }} />}
             label={wsLabel}
             size="small"
-            color={wsColor}
-            variant="outlined"
+            sx={{
+              borderRadius: 0,
+              bgcolor: '#f9f9f9',
+              borderColor: 'rgba(0, 0, 0, 0.1)',
+              color: '#0d0d0d',
+              fontSize: '12px',
+              height: '24px',
+            }}
           />
         </Tooltip>
         <Tooltip title="Muat ulang">
-          <IconButton size="small" onClick={() => refetch()}>
+          <IconButton
+            size="small"
+            onClick={() => refetch()}
+            sx={{
+              borderRadius: '10px',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              p: '5px',
+              color: '#0d0d0d',
+              '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' },
+            }}
+          >
             <RefreshIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Box>
 
       {/* Filter bar */}
-      <Card variant="outlined" sx={{ mb: 2 }}>
-        <CardContent sx={{ pb: '12px !important' }}>
+      <Card
+        variant="outlined"
+        sx={{
+          mb: 3,
+          borderRadius: '10px',
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          bgcolor: '#ffffff',
+        }}
+      >
+        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="flex-start">
             <TextField
               label="Cari"
@@ -120,7 +148,9 @@ export function EventsPage() {
               >
                 <MenuItem value="">Semua</MenuItem>
                 {cameras.map((cam) => (
-                  <MenuItem key={cam.id} value={cam.id}>{cam.name}</MenuItem>
+                  <MenuItem key={cam.id} value={cam.id}>
+                    {cam.name}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -128,33 +158,76 @@ export function EventsPage() {
               <Chip
                 label="Reset filter"
                 size="small"
-                onClick={() => { setEventType(''); setCameraId(''); setSearch('') }}
-                onDelete={() => { setEventType(''); setCameraId(''); setSearch('') }}
+                onClick={() => {
+                  setEventType('')
+                  setCameraId('')
+                  setSearch('')
+                }}
+                onDelete={() => {
+                  setEventType('')
+                  setCameraId('')
+                  setSearch('')
+                }}
+                sx={{
+                  borderRadius: 0,
+                  bgcolor: '#f9f9f9',
+                  borderColor: 'rgba(0, 0, 0, 0.1)',
+                  color: '#0d0d0d',
+                  height: '28px',
+                  alignSelf: 'center',
+                }}
               />
             )}
           </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Total {data?.total ?? 0} event
+          <Typography variant="caption" sx={{ mt: 1.5, display: 'block', color: '#8f8f8f' }}>
+            Total <strong style={{ color: '#0d0d0d' }}>{data?.total ?? 0}</strong> event ditemukan
           </Typography>
         </CardContent>
       </Card>
+
+      {isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {errMsg || 'Gagal mengambil data event.'}
+        </Alert>
+      )}
 
       <EventTimeline
         items={data?.items ?? []}
         isLoading={isLoading}
         isError={isError}
         errorMessage={errMsg}
+        isEmpty={!isLoading && !isError && (data?.items?.length ?? 0) === 0}
       />
 
-      {!isLoading && !isError && (data?.total ?? 0) > PAGE_SIZE && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+      {data && data.total > PAGE_SIZE && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
           <TablePagination
             component="div"
-            count={data?.total ?? 0}
+            count={data.total}
             page={page - 1}
-            onPageChange={(_: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => setPage(newPage + 1)}
+            onPageChange={(_: React.MouseEvent<HTMLButtonElement> | null, newPage: number) =>
+              setPage(newPage + 1)
+            }
             rowsPerPage={PAGE_SIZE}
             rowsPerPageOptions={[PAGE_SIZE]}
+            labelDisplayedRows={({
+              from,
+              to,
+              count,
+            }: {
+              from: number
+              to: number
+              count: number
+            }) => `${from}-${to} dari ${count}`}
+            sx={{
+              color: '#5d5d5d',
+              borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+              '.MuiTablePagination-actions button': {
+                color: '#0d0d0d',
+                borderRadius: '8px',
+                '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' },
+              },
+            }}
           />
         </Box>
       )}

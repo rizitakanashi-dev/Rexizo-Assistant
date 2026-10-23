@@ -18,15 +18,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   camera_status: 'Status kamera',
 }
 
-const EVENT_TYPE_COLOR: Record<string, 'default' | 'primary' | 'warning' | 'error' | 'info'> = {
-  motion: 'primary',
-  object_detected: 'warning',
-  camera_status: 'info',
-}
-
 function EventCard({ ev }: { ev: EventItem }) {
   const label = EVENT_TYPE_LABELS[ev.event_type] ?? ev.event_type.replace(/_/g, ' ')
-  const color = EVENT_TYPE_COLOR[ev.event_type] ?? 'default'
   const time = (() => {
     try {
       return format(parseISO(ev.timestamp), 'dd MMM yyyy HH:mm:ss', { locale: idLocale })
@@ -40,32 +33,99 @@ function EventCard({ ev }: { ev: EventItem }) {
   const snapshotUrl = resolveEventSnapshot(ev)
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
-        <Chip label={label} size="small" color={color} />
-        <Chip label={ev.camera_name} size="small" variant="outlined" />
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        borderRadius: '10px',
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        bgcolor: '#ffffff',
+        transition: 'background-color 0.15s ease',
+        '&:hover': {
+          bgcolor: 'rgba(0, 0, 0, 0.02)',
+        },
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.75 }}>
+        <Chip
+          label={label}
+          size="small"
+          sx={{
+            borderRadius: 0,
+            fontSize: '11px',
+            height: '20px',
+            bgcolor: '#0d0d0d',
+            color: '#ffffff',
+            fontWeight: 500,
+            border: 'none',
+          }}
+        />
+        <Chip
+          label={ev.camera_name}
+          size="small"
+          variant="outlined"
+          sx={{
+            borderRadius: 0,
+            fontSize: '11px',
+            height: '20px',
+            borderColor: 'rgba(0, 0, 0, 0.1)',
+            color: '#0d0d0d',
+            bgcolor: '#ffffff',
+          }}
+        />
         {ev.is_mock && (
-          <Chip label="[MOCK DATA]" size="small" color="warning" variant="filled" />
+          <Chip
+            label="[MOCK DATA]"
+            size="small"
+            sx={{
+              borderRadius: 0,
+              fontSize: '11px',
+              height: '20px',
+              bgcolor: '#f9f9f9',
+              color: '#0d0d0d',
+              fontWeight: 600,
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+            }}
+          />
         )}
         {ev.confidence !== null && ev.confidence !== undefined && (
           <Chip
             label={`${(ev.confidence * 100).toFixed(0)}% keyakinan`}
             size="small"
             variant="outlined"
+            sx={{
+              borderRadius: 0,
+              fontSize: '11px',
+              height: '20px',
+              borderColor: 'rgba(0, 0, 0, 0.1)',
+              color: '#5d5d5d',
+            }}
           />
         )}
         {snapshotUrl && (
-          <Chip label="Ada snapshot" size="small" color="default" variant="outlined" />
+          <Chip
+            label="Ada snapshot"
+            size="small"
+            variant="outlined"
+            sx={{
+              borderRadius: 0,
+              fontSize: '11px',
+              height: '20px',
+              borderColor: 'rgba(0, 0, 0, 0.1)',
+              color: '#5d5d5d',
+              bgcolor: '#f9f9f9',
+            }}
+          />
         )}
       </Box>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" sx={{ color: '#8f8f8f', fontSize: '12px' }}>
         {time}
       </Typography>
       {metaEntries.length > 0 && (
-        <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        <Box sx={{ mt: 0.75, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {metaEntries.slice(0, 6).map(([k, v]) => (
-            <Typography key={k} variant="caption" color="text.secondary" sx={{ mr: 1 }}>
-              {k}: <strong>{String(v)}</strong>
+            <Typography key={k} variant="caption" sx={{ color: '#5d5d5d', fontSize: '12px' }}>
+              {k}: <strong style={{ color: '#0d0d0d', fontWeight: 500 }}>{String(v)}</strong>
             </Typography>
           ))}
         </Box>
@@ -93,7 +153,12 @@ export function EventTimeline({
     return (
       <Stack spacing={1.5}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} variant="rounded" height={72} />
+          <Skeleton
+            key={i}
+            variant="rounded"
+            height={68}
+            sx={{ borderRadius: '10px', bgcolor: 'rgba(0, 0, 0, 0.04)' }}
+          />
         ))}
       </Stack>
     )
@@ -101,11 +166,20 @@ export function EventTimeline({
 
   if (isError) {
     return (
-      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-        <Typography color="error" gutterBottom>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 3,
+          textAlign: 'center',
+          borderRadius: '10px',
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          bgcolor: '#f9f9f9',
+        }}
+      >
+        <Typography sx={{ color: '#0d0d0d', fontWeight: 600, mb: 0.5 }}>
           Gagal memuat event
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{ color: '#8f8f8f' }}>
           {errorMessage ?? 'Periksa koneksi dan coba lagi'}
         </Typography>
       </Paper>
@@ -114,8 +188,19 @@ export function EventTimeline({
 
   if (isEmpty || items.length === 0) {
     return (
-      <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-        <Typography color="text.secondary">Belum ada event yang tercatat</Typography>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 4,
+          textAlign: 'center',
+          borderRadius: '10px',
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          bgcolor: '#f9f9f9',
+        }}
+      >
+        <Typography sx={{ color: '#8f8f8f', fontSize: '14px' }}>
+          Belum ada event yang tercatat
+        </Typography>
       </Paper>
     )
   }
@@ -144,14 +229,25 @@ export function EventTimeline({
         }
         return (
           <Box key={dateKey}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#8f8f8f',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  fontSize: '12px',
+                }}
+              >
                 {dateLabel}
               </Typography>
-              <Divider sx={{ flex: 1 }} />
+              <Divider sx={{ flex: 1, borderColor: 'rgba(0, 0, 0, 0.1)' }} />
             </Box>
             <Stack spacing={1}>
-              {evs.map((ev) => <EventCard key={ev.id} ev={ev} />)}
+              {evs.map((ev) => (
+                <EventCard key={ev.id} ev={ev} />
+              ))}
             </Stack>
           </Box>
         )

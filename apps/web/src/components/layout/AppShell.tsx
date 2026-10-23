@@ -1,5 +1,4 @@
 import {
-  AppBar,
   Box,
   Chip,
   Drawer,
@@ -9,7 +8,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Toolbar,
   Tooltip,
   Typography,
   useMediaQuery,
@@ -28,40 +26,136 @@ import { MockBanner } from './MockBanner'
 import { ChatPanel } from '../chat/ChatPanel'
 import { useUiStore } from '@/store/ui'
 
-const NAV_WIDTH = 200
+const NAV_WIDTH = 260
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', path: '/', icon: <DashboardIcon fontSize="small" /> },
-  { label: 'Kamera', path: '/cameras', icon: <VideocamIcon fontSize="small" /> },
-  { label: 'Events', path: '/events', icon: <TimelineIcon fontSize="small" /> },
-  { label: 'Pengaturan', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
+  { label: 'Dashboard', path: '/', icon: <DashboardIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
+  { label: 'Kamera', path: '/cameras', icon: <VideocamIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
+  { label: 'Events', path: '/events', icon: <TimelineIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
+  { label: 'Pengaturan', path: '/settings', icon: <SettingsIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
 ]
 
-function SideNav({ onClose }: { onClose?: () => void }) {
+function SideNavContent({ onClose }: { onClose?: () => void }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { toggleChat } = useUiStore()
 
   return (
-    <Box sx={{ width: NAV_WIDTH, pt: 1 }}>
-      <List dense>
-        {NAV_ITEMS.map((item) => {
-          const active = item.path === '/'
-            ? location.pathname === '/'
-            : location.pathname.startsWith(item.path)
-          return (
-            <ListItem key={item.path} disablePadding>
-              <ListItemButton
-                selected={active}
-                onClick={() => { navigate(item.path); onClose?.() }}
-                sx={{ borderRadius: 1, mx: 0.5, mb: 0.25 }}
-              >
-                <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.label} primaryTypographyProps={{ variant: 'body2' }} />
-              </ListItemButton>
-            </ListItem>
-          )
-        })}
-      </List>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#f9f9f9' }}>
+      {/* Sidebar Header */}
+      <Box
+        sx={{
+          height: 52,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          px: 2,
+          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Typography variant="body1" sx={{ fontWeight: 600, color: '#0d0d0d', letterSpacing: '0px' }}>
+          JARVIS
+        </Typography>
+        <Chip
+          label="v0.1"
+          size="small"
+          sx={{
+            borderRadius: 0,
+            fontSize: '11px',
+            height: '20px',
+            bgcolor: '#ffffff',
+            borderColor: 'rgba(0, 0, 0, 0.1)',
+            color: '#5d5d5d',
+          }}
+        />
+      </Box>
+
+      {/* Navigation List */}
+      <Box sx={{ flex: 1, p: 1, overflowY: 'auto' }}>
+        <List dense disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {NAV_ITEMS.map((item) => {
+            const active =
+              item.path === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(item.path)
+            return (
+              <ListItem key={item.path} disablePadding>
+                <ListItemButton
+                  selected={active}
+                  onClick={() => {
+                    navigate(item.path)
+                    onClose?.()
+                  }}
+                  sx={{
+                    borderRadius: '10px',
+                    px: '10px',
+                    py: '6px',
+                    bgcolor: active ? 'rgba(0, 0, 0, 0.06)' : 'transparent',
+                    '&:hover': {
+                      bgcolor: 'rgba(0, 0, 0, 0.05)',
+                    },
+                    '&.Mui-selected': {
+                      bgcolor: 'rgba(0, 0, 0, 0.06)',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 0, 0, 0.08)',
+                      },
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 32 }}>{item.icon}</ListItemIcon>
+                  <ListItemText
+                    primary={item.label}
+                    primaryTypographyProps={{
+                      fontSize: '14px',
+                      fontWeight: active ? 600 : 400,
+                      color: '#0d0d0d',
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            )
+          })}
+        </List>
+      </Box>
+
+      {/* Sidebar Footer */}
+      <Box
+        sx={{
+          p: 1.5,
+          borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+        }}
+      >
+        <ListItemButton
+          onClick={() => {
+            toggleChat()
+            onClose?.()
+          }}
+          sx={{
+            borderRadius: '10px',
+            px: '10px',
+            py: '8px',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            bgcolor: '#ffffff',
+            '&:hover': {
+              bgcolor: 'rgba(0, 0, 0, 0.05)',
+              borderColor: 'rgba(0, 0, 0, 0.2)',
+            },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <ChatIcon fontSize="small" sx={{ color: '#0d0d0d' }} />
+          </ListItemIcon>
+          <ListItemText
+            primary="Asisten JARVIS"
+            secondary="Buka chat"
+            primaryTypographyProps={{ fontSize: '13px', fontWeight: 500, color: '#0d0d0d' }}
+            secondaryTypographyProps={{ fontSize: '12px', color: '#8f8f8f' }}
+          />
+        </ListItemButton>
+      </Box>
     </Box>
   )
 }
@@ -73,58 +167,114 @@ export function AppShell({ children }: PropsWithChildren) {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
-      <AppBar position="sticky" elevation={0} sx={{ borderBottom: '1px solid rgba(255,255,255,0.08)', zIndex: theme.zIndex.drawer + 1 }}>
-        <Toolbar sx={{ gap: 1.5 }}>
-          {isMobile && (
-            <IconButton color="inherit" size="small" onClick={() => setMobileNavOpen(true)}>
-              <MenuIcon />
-            </IconButton>
-          )}
-          <Typography variant="h6" sx={{ fontWeight: 700, mr: 1 }}>
-            JARVIS
-          </Typography>
-          <Chip label="v0.1" size="small" variant="outlined" sx={{ opacity: 0.6 }} />
-          <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#ffffff' }}>
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <Box
+          component="nav"
+          sx={{
+            width: NAV_WIDTH,
+            flexShrink: 0,
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+            bgcolor: '#f9f9f9',
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
+            overflow: 'hidden',
+          }}
+        >
+          <SideNavContent />
+        </Box>
+      )}
+
+      {/* Mobile nav drawer */}
+      <Drawer
+        anchor="left"
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        PaperProps={{
+          sx: {
+            width: NAV_WIDTH,
+            bgcolor: '#f9f9f9',
+            borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+            boxShadow: 'none',
+          },
+        }}
+      >
+        <SideNavContent onClose={() => setMobileNavOpen(false)} />
+      </Drawer>
+
+      {/* Main column */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+        {/* Top bar header */}
+        <Box
+          component="header"
+          sx={{
+            height: 52,
+            px: { xs: 2, md: 3 },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+            bgcolor: '#ffffff',
+            position: 'sticky',
+            top: 0,
+            zIndex: theme.zIndex.appBar,
+            gap: 2,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+            {isMobile && (
+              <IconButton
+                size="small"
+                onClick={() => setMobileNavOpen(true)}
+                sx={{
+                  color: '#0d0d0d',
+                  p: '6px',
+                  borderRadius: '10px',
+                  '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' },
+                }}
+              >
+                <MenuIcon fontSize="small" />
+              </IconButton>
+            )}
             <StatusStrip />
           </Box>
-          <Tooltip title="Chat JARVIS">
-            <IconButton color="inherit" onClick={toggleChat}>
-              <ChatIcon />
+
+          <Tooltip title="Buka Asisten JARVIS">
+            <IconButton
+              size="small"
+              onClick={toggleChat}
+              sx={{
+                color: '#0d0d0d',
+                p: '6px',
+                borderRadius: '10px',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                bgcolor: '#ffffff',
+                '&:hover': {
+                  bgcolor: 'rgba(0, 0, 0, 0.05)',
+                  borderColor: 'rgba(0, 0, 0, 0.2)',
+                },
+              }}
+            >
+              <ChatIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-        </Toolbar>
+        </Box>
+
         <MockBanner />
-      </AppBar>
 
-      <Box sx={{ display: 'flex', flex: 1 }}>
-        {/* Desktop sidebar */}
-        {!isMobile && (
-          <Box
-            component="nav"
-            sx={{
-              width: NAV_WIDTH,
-              flexShrink: 0,
-              borderRight: '1px solid rgba(255,255,255,0.08)',
-              bgcolor: 'background.paper',
-            }}
-          >
-            <SideNav />
-          </Box>
-        )}
-
-        {/* Mobile nav drawer */}
-        <Drawer
-          anchor="left"
-          open={mobileNavOpen}
-          onClose={() => setMobileNavOpen(false)}
-          PaperProps={{ sx: { width: NAV_WIDTH + 16 } }}
+        {/* Page body content */}
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            p: { xs: 2, md: 3 },
+            maxWidth: '1200px',
+            width: '100%',
+            mx: 'auto',
+          }}
         >
-          <Toolbar />
-          <SideNav onClose={() => setMobileNavOpen(false)} />
-        </Drawer>
-
-        <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
           {children}
         </Box>
       </Box>
@@ -134,7 +284,14 @@ export function AppShell({ children }: PropsWithChildren) {
         anchor="right"
         open={chatOpen}
         onClose={toggleChat}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 420 } } }}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 440 },
+            borderLeft: '1px solid rgba(0, 0, 0, 0.1)',
+            boxShadow: 'none',
+            bgcolor: '#ffffff',
+          },
+        }}
       >
         <ChatPanel />
       </Drawer>

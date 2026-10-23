@@ -12,16 +12,8 @@ const AI_LABEL: Record<string, string> = {
   available: 'AI siap',
   degraded: 'AI menurun',
   unavailable: 'AI mati',
-  not_configured: 'AI belum diatur',
+  not_configured: 'AI lokal (mock)',
   disabled: 'AI dimatikan',
-}
-
-const AI_COLOR: Record<string, 'success' | 'warning' | 'error' | 'default'> = {
-  available: 'success',
-  degraded: 'warning',
-  unavailable: 'error',
-  not_configured: 'default',
-  disabled: 'default',
 }
 
 export function StatusStrip() {
@@ -29,7 +21,7 @@ export function StatusStrip() {
   const sys = useSystemStatus()
 
   if (health.isLoading || sys.isLoading) {
-    return <Skeleton width={420} height={24} />
+    return <Skeleton width={380} height={20} sx={{ borderRadius: '6px' }} />
   }
 
   const cpu = sys.data?.cpu_usage_percent ?? 0
@@ -38,42 +30,87 @@ export function StatusStrip() {
   const active = sys.data?.active_cameras ?? 0
   const total = sys.data?.total_cameras ?? 0
   const eventsToday = sys.data?.events_today ?? 0
-  // `ai.state` backend bersifat otoritatif (ruling G-7); helperHandles fallback.
+  // `ai.state` backend bersifat otoritatif (ruling G-7); helper handles fallback.
   const aiState = mapAiState(health.data, sys.data)
   const mockMode = health.data?.mock_mode === true
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
       <Tooltip title="CPU">
-        <Typography variant="body2" color={cpu >= 90 ? 'error' : cpu >= 75 ? 'warning.main' : 'text.secondary'}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: '13px',
+            color: cpu >= 75 ? '#0d0d0d' : '#5d5d5d',
+            fontWeight: cpu >= 75 ? 600 : 400,
+          }}
+        >
           CPU {cpu.toFixed(0)}%
         </Typography>
       </Tooltip>
       <Tooltip title="Memori">
-        <Typography variant="body2" color={mem >= 90 ? 'error' : mem >= 75 ? 'warning.main' : 'text.secondary'}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: '13px',
+            color: mem >= 75 ? '#0d0d0d' : '#5d5d5d',
+            fontWeight: mem >= 75 ? 600 : 400,
+          }}
+        >
           RAM {mem.toFixed(0)}%
         </Typography>
       </Tooltip>
       <Tooltip title="Disk bebas">
-        <Typography variant="body2" color={disk < 10 ? 'error' : disk < 25 ? 'warning.main' : 'text.secondary'}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontSize: '13px',
+            color: disk < 25 ? '#0d0d0d' : '#5d5d5d',
+            fontWeight: disk < 25 ? 600 : 400,
+          }}
+        >
           Disk {disk.toFixed(1)} GB
         </Typography>
       </Tooltip>
-      <Typography variant="body2" color="text.secondary">
-        Kamera {active}/{total}
+      <Typography variant="body2" sx={{ fontSize: '13px', color: '#5d5d5d' }}>
+        Kamera <strong style={{ color: '#0d0d0d', fontWeight: 500 }}>{active}/{total}</strong>
       </Typography>
-      <Typography variant="body2" color="text.secondary">
-        Event hari ini {eventsToday}
+      <Typography variant="body2" sx={{ fontSize: '13px', color: '#5d5d5d' }}>
+        Event hari ini <strong style={{ color: '#0d0d0d', fontWeight: 500 }}>{eventsToday}</strong>
       </Typography>
       {sys.data?.uptime_seconds !== undefined && (
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" sx={{ fontSize: '13px', color: '#8f8f8f' }}>
           Uptime {fmtUptime(sys.data.uptime_seconds)}
         </Typography>
       )}
-      <Chip size="small" label={AI_LABEL[aiState]} color={AI_COLOR[aiState]} variant="outlined" />
+      <Chip
+        size="small"
+        label={AI_LABEL[aiState] ?? 'AI'}
+        sx={{
+          borderRadius: 0,
+          fontSize: '11px',
+          height: '20px',
+          bgcolor: '#f9f9f9',
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          color: '#0d0d0d',
+          fontWeight: 500,
+        }}
+      />
       {mockMode && (
         <Tooltip title="Mode data sintetis aktif">
-          <Chip size="small" label="MOCK" color="warning" variant="filled" />
+          <Chip
+            size="small"
+            label="MOCK"
+            sx={{
+              borderRadius: 0,
+              fontSize: '11px',
+              height: '20px',
+              bgcolor: '#0d0d0d',
+              color: '#ffffff',
+              fontWeight: 600,
+              border: 'none',
+            }}
+          />
         </Tooltip>
       )}
     </Box>

@@ -15,7 +15,9 @@ from ..deps import ApiKeyDep, SessionDep, SurveillanceDep
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
 
-_RTSP_PATTERN = re.compile(r"^(rtsp|rtmp|http|https)://[^\s/]+", re.IGNORECASE)
+_RTSP_PATTERN = re.compile(
+    r"^((rtsp|rtmp|http|https)://[^\s]+|device://.+|/dev/video\d+|\d+)$", re.IGNORECASE
+)
 
 
 def _to_schema(camera) -> CameraStatus:

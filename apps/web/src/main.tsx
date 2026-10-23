@@ -5,6 +5,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { theme } from './theme'
+import './index.css'
 
 const qc = new QueryClient({
   defaultOptions: {

@@ -90,7 +90,42 @@ class SurveillanceService:
     async def sync_cameras(self) -> None:
         """Menyesuaikan worker aktif dengan daftar kamera di database."""
         async with self._database.session() as session:
-            cameras = await CameraRepository(session).list()
+            repo = CameraRepository(session)
+            cameras = await repo.list()
+            if not cameras and not self._settings.test_mode and self._settings.mock_camera_feed:
+                logger.info("Database kamera kosong — mendaftarkan kamera demo sintetis")
+                c1 = await repo.create(
+                    camera_id="cam_front",
+                    name="Kamera Depan",
+                    rtsp_url="rtsp://mock/cam_front",
+                    motion_detection_enabled=True,
+                    object_detection_enabled=True,
+                    is_mock=True,
+                )
+                c2 = await repo.create(
+                    camera_id="cam_backyard",
+                    name="Kamera Halaman",
+                    rtsp_url="rtsp://mock/cam_backyard",
+                    motion_detection_enabled=True,
+                    object_detection_enabled=True,
+                    is_mock=True,
+                )
+                cameras = [c1, c2]
+
+            # Auto-register local webcam device if available and not yet registered
+            if not self._settings.test_mode:
+                device_path = Path("/dev/video0")
+                if device_path.exists() and await repo.get("cam_device") is None:
+                    logger.info("Perangkat kamera lokal terdeteksi (/dev/video0) — mendaftarkan cam_device")
+                    await repo.create(
+                        camera_id="cam_device",
+                        name="Kamera Device (Webcam)",
+                        rtsp_url="/dev/video0",
+                        motion_detection_enabled=True,
+                        object_detection_enabled=True,
+                        is_mock=False,
+                    )
+                    cameras = await repo.list()
         specs = [
             CameraSpec(
                 id=camera.id,
@@ -99,7 +134,7 @@ class SurveillanceService:
                 is_enabled=camera.is_enabled,
                 motion_detection_enabled=camera.motion_detection_enabled,
                 object_detection_enabled=camera.object_detection_enabled,
-                is_mock=camera.is_mock or self._settings.mock_camera_feed,
+                is_mock=bool(camera.is_mock),
             )
             for camera in cameras
         ]
@@ -117,7 +152,7 @@ class SurveillanceService:
                 is_enabled=camera.is_enabled,
                 motion_detection_enabled=camera.motion_detection_enabled,
                 object_detection_enabled=camera.object_detection_enabled,
-                is_mock=camera.is_mock or self._settings.mock_camera_feed,
+                is_mock=bool(camera.is_mock),
             )
         return self._runtime.restart_camera(spec)
 

@@ -407,8 +407,7 @@ class FakeProvider:
         if tool_name is None:
             return LLMResponse(
                 content=(
-                    "Saya bisa membantu dengan status kamera, log event surveillance, "
-                    "dan status sistem. Tolong sebutkan detailnya."
+                    "At your service, Sir. J.A.R.V.I.S. online. Semua sensor perimeter dan kamera pengawas berada dalam kondisi siaga. Ada yang bisa saya bantu?"
                 )
             )
         return LLMResponse(
@@ -459,30 +458,30 @@ class FakeProvider:
     def _summarize(self, tool_name: str, payload: Any) -> str:
         if tool_name in {"get_camera_list", "list_cameras"} and isinstance(payload, list):
             if not payload:
-                return "Belum ada kamera yang terdaftar."
+                return "Belum ada kamera yang terdaftar, Sir."
             details = ", ".join(
                 f"{item.get('name')} ({item.get('status')})" for item in payload[:5]
             )
-            return f"Ada {len(payload)} kamera terdaftar: {details}."
+            return f"Siap Sir, terdapat {len(payload)} kamera terdaftar: {details}."
         if tool_name in {"get_recent_events", "search_events"} and isinstance(payload, list):
             if not payload:
-                return "Tidak ada event yang tercatat pada rentang waktu tersebut."
+                return "Perimeter bersih, Sir. Tidak ada event yang tercatat pada rentang waktu tersebut."
             latest = payload[0]
             return (
-                f"Ditemukan {len(payload)} event terbaru. Yang terakhir: "
+                f"Laporan perimeter, Sir: ditemukan {len(payload)} event terbaru. Terakhir tercatat: "
                 f"{latest.get('event_type')} di kamera {latest.get('camera_name')} "
                 f"pada {latest.get('timestamp')}."
             )
         if tool_name == "get_system_status" and isinstance(payload, dict):
             return (
-                "Status sistem: CPU "
+                "Status diagnostik sistem nominal, Sir: CPU "
                 f"{payload.get('cpu_usage_percent')}%, memori "
                 f"{payload.get('memory_usage_percent')}%, disk bebas "
                 f"{payload.get('disk_free_gb')} GB, {payload.get('active_cameras')} dari "
                 f"{payload.get('total_cameras')} kamera online, {payload.get('events_today')} "
                 "event hari ini."
             )
-        return "Data telah retrieved dari sistem lokal."
+        return "Data telah diverifikasi dari sistem lokal, Sir."
 
 
 # Alias kompatibilitas dengan implementasi sebelumnya.
