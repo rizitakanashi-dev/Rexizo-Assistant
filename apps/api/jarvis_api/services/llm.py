@@ -93,17 +93,40 @@ _TOOL_CALL_BLOCK = re.compile(
     r"```(?:tool_call|json)?\s*(\{.*?\})\s*```",
     re.DOTALL | re.IGNORECASE,
 )
+_XML_TOOL_CALL = re.compile(r"<tool_call>(.*?)</tool_call>", re.DOTALL | re.IGNORECASE)
 
 
 def parse_tool_call_from_text(content: str) -> ToolCall | None:
-    """Ambil satu tool call dari teks model (mode prompt).
-
-    Bentuk yang diterima:
-    - blok ```tool_call {"tool": "get_camera_list", "arguments": {}}```
-    - JSON mentah di dalam ``` ``` ``` atau di teks biasa.
-    """
+    """Ambil satu tool call dari teks model (mode prompt atau tag XML/JSON)."""
     if not content:
         return None
+
+    # 1. Coba deteksi format XML <tool_call>...</tool_call>
+    xml_match = _XML_TOOL_CALL.search(content)
+    if xml_match:
+        inner = xml_match.group(1).strip()
+        # Jika di dalamnya ternyata JSON:
+        if inner.startswith("{") and inner.endswith("}"):
+            try:
+                data = json.loads(inner)
+                if isinstance(data, dict):
+                    name = data.get("tool") or data.get("name") or data.get("tool_name")
+                    if name:
+                        args = data.get("arguments") or data.get("parameters") or data.get("args") or {}
+                        return ToolCall(id="call_xml_json", name=str(name), arguments=args if isinstance(args, dict) else {})
+            except json.JSONDecodeError:
+                pass
+        # Jika format tag XML <action>...</action>
+        lines = inner.split("\n", 1)
+        tool_name = lines[0].strip().replace("<name>", "").replace("</name>", "")
+        rest = lines[1] if len(lines) > 1 else ""
+        args: dict[str, Any] = {}
+        for param_match in re.finditer(r"<([a-zA-Z0-9_]+)>(.*?)</\1>", rest, re.DOTALL):
+            args[param_match.group(1)] = param_match.group(2).strip()
+        if tool_name and re.match(r"^[a-zA-Z0-9_]+$", tool_name):
+            return ToolCall(id="call_xml_tag", name=tool_name, arguments=args)
+
+    # 2. Coba deteksi blok JSON ```tool_call {...}```
     candidates: list[str] = []
     for match in _TOOL_CALL_BLOCK.finditer(content):
         candidates.append(match.group(1))
@@ -372,6 +395,15 @@ _SYSTEM_KEYWORDS = re.compile(
     r"\b(sistem|system|cpu|ram|disk|penyimpanan|storage|server)\b", re.IGNORECASE
 )
 _CAMERA_KEYWORDS = re.compile(r"\b(kamera|camera|cctv|front door|depan)\b", re.IGNORECASE)
+_LAUNCH_KEYWORDS = re.compile(
+    r"\b(buka|jalankan|open|launch|start|mulai)\b", re.IGNORECASE
+)
+_CONTROL_KEYWORDS = re.compile(
+    r"\b(volume|suara|kecerahan|brightness|lagu|musik|music|play|pause|mute|lock|kunci\s+layar)\b",
+    re.IGNORECASE,
+)
+_SCREENSHOT_KEYWORDS = re.compile(r"\b(screenshot|tangkapan\s+layar|cuplikan\s+layar)\b", re.IGNORECASE)
+_TERMINAL_KEYWORDS = re.compile(r"\b(terminal|bash|shell|perintah|command)\b", re.IGNORECASE)
 
 
 class FakeProvider:
@@ -435,6 +467,14 @@ class FakeProvider:
     def _pick_tool(self, user_text: str, tools: list[dict[str, Any]] | None) -> str | None:
         available = {tool["function"]["name"] for tool in tools or []}
         candidates: list[str] = []
+        if _SCREENSHOT_KEYWORDS.search(user_text):
+            candidates.append("take_screenshot")
+        if _LAUNCH_KEYWORDS.search(user_text):
+            candidates.append("launch_application")
+        if _CONTROL_KEYWORDS.search(user_text):
+            candidates.append("system_control")
+        if _TERMINAL_KEYWORDS.search(user_text):
+            candidates.append("run_terminal_command")
         if _SEARCH_KEYWORDS.search(user_text):
             candidates.append("search_events")
         if _EVENT_KEYWORDS.search(user_text):
@@ -481,6 +521,14 @@ class FakeProvider:
                 f"{payload.get('total_cameras')} kamera online, {payload.get('events_today')} "
                 "event hari ini."
             )
+        if tool_name == "launch_application" and isinstance(payload, dict):
+            return f"Siap, aplikasi {payload.get('app', 'yang diminta')} telah dibuka di desktop Arch Linux."
+        if tool_name == "system_control" and isinstance(payload, dict):
+            return f"Perintah kontrol sistem {payload.get('action')} berhasil dijalankan: {payload.get('message', 'Selesai')}."
+        if tool_name == "take_screenshot" and isinstance(payload, dict):
+            return f"Tangkapan layar berhasil disimpan ke {payload.get('saved_to', 'folder Pictures')}."
+        if tool_name == "run_terminal_command" and isinstance(payload, dict):
+            return f"Perintah terminal selesai dijalankan:\n{payload.get('stdout') or payload.get('stderr') or 'Selesai.'}"
         return "Data telah diverifikasi dari sistem lokal, Sir."
 
 

@@ -95,9 +95,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AI_TOOLS_ENABLED", "JARVIS_AI_TOOLS_ENABLED"),
     )
     ai_mutating_tools_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias=AliasChoices(
-            "AI_MUTATING_TOOLS_ENABLED", "JARVIS_AI_MUTATING_TOOLS_ENABLED"
+            "AI_MUTATING_TOOLS_ENABLED", "REXIZO_MUTATING_TOOLS_ENABLED", "JARVIS_AI_MUTATING_TOOLS_ENABLED"
         ),
     )
     ai_tool_first: ToolFirstMode = Field(

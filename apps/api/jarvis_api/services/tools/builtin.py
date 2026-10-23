@@ -47,6 +47,39 @@ class DeleteHistoryParams(BaseModel):
     older_than_days: int = Field(default=30, ge=1, le=3650, description="Umur data yang dihapus")
 
 
+class LaunchAppParams(BaseModel):
+    app_name: str = Field(
+        description="Nama aplikasi yang ingin dibuka di Arch Linux (misal: firefox, brave, chrome, discord, spotify, steam, code, vscode, terminal, kitty, thunar, dsb)"
+    )
+    args: str | None = Field(
+        default=None,
+        description="Argumen baris perintah atau URL tambahan jika ada",
+    )
+
+
+class SystemControlParams(BaseModel):
+    action: str = Field(
+        description="Aksi kontrol sistem: volume_up | volume_down | volume_mute | set_volume | brightness_up | brightness_down | set_brightness | media_play_pause | media_next | media_prev | lock_screen | notify"
+    )
+    value: str | None = Field(
+        default=None,
+        description="Nilai aksi (misal persen volume '50%', persen brightness '80%', atau teks pesan notifikasi)",
+    )
+
+
+class RunTerminalCommandParams(BaseModel):
+    command: str = Field(
+        description="Perintah shell terminal Linux (bash) yang ingin dieksekusi di Arch Linux"
+    )
+
+
+class TakeScreenshotParams(BaseModel):
+    filename: str | None = Field(
+        default=None,
+        description="Nama file screenshot opsional (default: screenshot_<timestamp>.png)",
+    )
+
+
 def _iso(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -195,6 +228,222 @@ async def _delete_event_history(
     }
 
 
+APP_COMMAND_MAP: dict[str, list[str]] = {
+    "firefox": ["firefox"],
+    "browser": ["firefox", "brave-browser", "chromium"],
+    "web": ["firefox", "brave-browser"],
+    "brave": ["brave-browser"],
+    "chrome": ["google-chrome-stable", "chromium", "brave-browser", "firefox"],
+    "code": ["code", "code-oss"],
+    "vscode": ["code", "code-oss"],
+    "vs code": ["code", "code-oss"],
+    "visual studio code": ["code", "code-oss"],
+    "discord": ["discord"],
+    "spotify": ["spotify"],
+    "steam": ["steam"],
+    "telegram": ["telegram-desktop"],
+    "terminal": ["kitty", "foot"],
+    "konsol": ["kitty", "foot"],
+    "kitty": ["kitty"],
+    "foot": ["foot"],
+    "file manager": ["thunar", "nautilus", "dolphin", "pcmanfm"],
+    "files": ["thunar", "nautilus", "dolphin", "pcmanfm"],
+    "berkas": ["thunar", "nautilus", "dolphin", "pcmanfm"],
+    "calculator": ["gnome-calculator", "kcalc", "galculator"],
+    "kalkulator": ["gnome-calculator", "kcalc", "galculator"],
+}
+
+
+def _resolve_executable(app_name: str) -> list[str]:
+    import shutil
+    key = app_name.strip().lower()
+    if key in APP_COMMAND_MAP:
+        for c in APP_COMMAND_MAP[key]:
+            if shutil.which(c):
+                return [c]
+    first = key.split()[0]
+    if shutil.which(first):
+        return [first]
+    if shutil.which("gtk-launch"):
+        return ["gtk-launch", key]
+    if shutil.which("xdg-open"):
+        return ["xdg-open", key]
+    return [key]
+
+
+async def _launch_app(params: LaunchAppParams, context: ToolContext) -> dict[str, Any]:
+    import os
+    import subprocess
+    cmd_parts = _resolve_executable(params.app_name)
+    if params.args:
+        cmd_parts.append(params.args)
+    try:
+        env = os.environ.copy()
+        if "WAYLAND_DISPLAY" not in env and "DISPLAY" not in env:
+            env["WAYLAND_DISPLAY"] = "wayland-1"
+            env["DISPLAY"] = ":1"
+        subprocess.Popen(cmd_parts, start_new_session=True, env=env)
+        return {
+            "status": "launched",
+            "app": params.app_name,
+            "command": " ".join(cmd_parts),
+            "message": f"Aplikasi {params.app_name} berhasil dibuka di sistem Arch Linux.",
+        }
+    except Exception as exc:
+        logger.error("Gagal membuka aplikasi %s: %s", params.app_name, exc)
+        return {"status": "error", "app": params.app_name, "message": str(exc)}
+
+
+async def _system_control(params: SystemControlParams, context: ToolContext) -> dict[str, Any]:
+    import os
+    import shutil
+    import subprocess
+    act = params.action.strip().lower()
+    env = os.environ.copy()
+    val = params.value or ""
+
+    try:
+        if act == "volume_up":
+            if shutil.which("wpctl"):
+                subprocess.run(["wpctl", "set-volume", "-l", "1.5", "@DEFAULT_AUDIO_SINK@", "5%+"], check=False)
+            elif shutil.which("pamixer"):
+                subprocess.run(["pamixer", "-i", "5"], check=False)
+            return {"status": "ok", "action": "volume_up", "message": "Volume suara dinaikkan 5%"}
+
+        if act == "volume_down":
+            if shutil.which("wpctl"):
+                subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"], check=False)
+            elif shutil.which("pamixer"):
+                subprocess.run(["pamixer", "-d", "5"], check=False)
+            return {"status": "ok", "action": "volume_down", "message": "Volume suara diturunkan 5%"}
+
+        if act == "volume_mute":
+            if shutil.which("wpctl"):
+                subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], check=False)
+            elif shutil.which("pamixer"):
+                subprocess.run(["pamixer", "-t"], check=False)
+            return {"status": "ok", "action": "volume_mute", "message": "Status mute volume di-toggle"}
+
+        if act == "set_volume":
+            clean_pct = val.replace("%", "").strip() or "50"
+            if shutil.which("pamixer"):
+                subprocess.run(["pamixer", "--set-volume", clean_pct], check=False)
+            elif shutil.which("wpctl"):
+                ratio = float(clean_pct) / 100.0
+                subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(ratio)], check=False)
+            return {"status": "ok", "action": "set_volume", "message": f"Volume diatur ke {clean_pct}%"}
+
+        if act == "brightness_up":
+            if shutil.which("brightnessctl"):
+                subprocess.run(["brightnessctl", "set", "+10%"], check=False)
+            return {"status": "ok", "action": "brightness_up", "message": "Kecerahan layar dinaikkan 10%"}
+
+        if act == "brightness_down":
+            if shutil.which("brightnessctl"):
+                subprocess.run(["brightnessctl", "set", "10%-"], check=False)
+            return {"status": "ok", "action": "brightness_down", "message": "Kecerahan layar diturunkan 10%"}
+
+        if act == "set_brightness":
+            clean_pct = val.strip() or "50%"
+            if shutil.which("brightnessctl"):
+                subprocess.run(["brightnessctl", "set", clean_pct], check=False)
+            return {"status": "ok", "action": "set_brightness", "message": f"Kecerahan layar diatur ke {clean_pct}"}
+
+        if act in ("media_play_pause", "media_play", "media_pause"):
+            if shutil.which("playerctl"):
+                cmd = "play-pause" if act == "media_play_pause" else act.replace("media_", "")
+                subprocess.run(["playerctl", cmd], check=False)
+            return {"status": "ok", "action": act, "message": f"Kontrol pemutar musik ({act}) berhasil"}
+
+        if act == "media_next":
+            if shutil.which("playerctl"):
+                subprocess.run(["playerctl", "next"], check=False)
+            return {"status": "ok", "action": "media_next", "message": "Memutar lagu berikutnya"}
+
+        if act == "media_prev":
+            if shutil.which("playerctl"):
+                subprocess.run(["playerctl", "previous"], check=False)
+            return {"status": "ok", "action": "media_prev", "message": "Memutar lagu sebelumnya"}
+
+        if act == "lock_screen":
+            if shutil.which("loginctl"):
+                subprocess.run(["loginctl", "lock-session"], check=False)
+            elif shutil.which("hyprlock"):
+                subprocess.Popen(["hyprlock"], start_new_session=True, env=env)
+            return {"status": "ok", "action": "lock_screen", "message": "Layar sistem dikunci"}
+
+        if act == "notify":
+            msg = val or "Pemberitahuan dari Rexizo Assistant"
+            if shutil.which("notify-send"):
+                subprocess.run(["notify-send", "Rexizo Assistant", msg], check=False, env=env)
+            return {"status": "ok", "action": "notify", "message": f"Notifikasi terkirim: {msg}"}
+
+        return {"status": "error", "action": act, "message": f"Aksi kontrol '{act}' tidak dikenali"}
+    except Exception as exc:
+        return {"status": "error", "action": act, "message": str(exc)}
+
+
+async def _run_terminal_command(
+    params: RunTerminalCommandParams, context: ToolContext
+) -> dict[str, Any]:
+    import os
+    import subprocess
+    try:
+        proc = subprocess.run(
+            params.command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env=os.environ.copy(),
+        )
+        return {
+            "status": "completed" if proc.returncode == 0 else "failed",
+            "returncode": proc.returncode,
+            "stdout": proc.stdout[-2500:] if proc.stdout else "",
+            "stderr": proc.stderr[-1000:] if proc.stderr else "",
+            "command": params.command,
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "command": params.command, "message": "Perintah melebihi batas 15 detik"}
+    except Exception as exc:
+        return {"status": "error", "command": params.command, "message": str(exc)}
+
+
+async def _take_screenshot(
+    params: TakeScreenshotParams, context: ToolContext
+) -> dict[str, Any]:
+    import os
+    import shutil
+    import subprocess
+    import time
+    from pathlib import Path
+    pictures_dir = Path.home() / "Pictures"
+    pictures_dir.mkdir(parents=True, exist_ok=True)
+    fname = params.filename or f"screenshot_{int(time.time())}.png"
+    if not fname.endswith(".png"):
+        fname += ".png"
+    dest = pictures_dir / fname
+    env = os.environ.copy()
+    if "WAYLAND_DISPLAY" not in env and "DISPLAY" not in env:
+        env["WAYLAND_DISPLAY"] = "wayland-1"
+        env["DISPLAY"] = ":1"
+
+    try:
+        if shutil.which("grim"):
+            proc = subprocess.run(["grim", str(dest)], env=env, capture_output=True, text=True)
+            if proc.returncode == 0 and dest.exists():
+                return {
+                    "status": "success",
+                    "saved_to": str(dest),
+                    "size_bytes": dest.stat().st_size,
+                    "message": f"Screenshot berhasil diambil dan disimpan ke {dest}",
+                }
+        return {"status": "error", "message": "Alat screenshot 'grim' tidak tersedia atau gagal"}
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+
+
 def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
     """Mendaftarkan seluruh tool bawaan ke registry."""
     registry.register(
@@ -262,6 +511,54 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
             parameters=DeleteHistoryParams,
             handler=_delete_event_history,
             risk=ToolRisk.DESTRUCTIVE,
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="launch_application",
+            description=(
+                "Buka aplikasi apa pun di desktop Arch Linux (misal: firefox, brave, chrome, "
+                "discord, spotify, steam, code, terminal, kitty, dsb)."
+            ),
+            parameters=LaunchAppParams,
+            handler=_launch_app,
+            risk=ToolRisk.MUTATING,
+            aliases=["open_app", "launch_app"],
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="system_control",
+            description=(
+                "Kontrol audio, layar, media, dan notifikasi sistem Arch Linux: "
+                "volume_up, volume_down, volume_mute, set_volume, brightness_up, "
+                "brightness_down, set_brightness, media_play_pause, media_next, media_prev, "
+                "lock_screen, notify."
+            ),
+            parameters=SystemControlParams,
+            handler=_system_control,
+            risk=ToolRisk.MUTATING,
+            aliases=["control_system"],
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="run_terminal_command",
+            description="Jalankan perintah bash terminal Linux di sistem Arch Linux.",
+            parameters=RunTerminalCommandParams,
+            handler=_run_terminal_command,
+            risk=ToolRisk.MUTATING,
+            aliases=["terminal_exec", "run_command"],
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="take_screenshot",
+            description="Ambil tangkapan layar (screenshot) desktop Linux Wayland dan simpan ke file gambar.",
+            parameters=TakeScreenshotParams,
+            handler=_take_screenshot,
+            risk=ToolRisk.MUTATING,
+            aliases=["screenshot"],
         )
     )
     return registry

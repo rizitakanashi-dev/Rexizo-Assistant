@@ -332,10 +332,13 @@ class ChatService:
     async def _run_tool(
         self, call: Any, context: ToolContext
     ) -> tuple[dict[str, Any], ToolExecution]:
+        allow_mutating = self._settings.ai_mutating_tools_enabled
         try:
             result = await asyncio.wait_for(
-                self._registry.execute(call.name, call.arguments, context, allow_mutating=False),
-                timeout=5.0,
+                self._registry.execute(
+                    call.name, call.arguments, context, allow_mutating=allow_mutating
+                ),
+                timeout=15.0,
             )
         except TimeoutError:
             logger.warning("Tool '%s' timeout (>5s)", call.name)
