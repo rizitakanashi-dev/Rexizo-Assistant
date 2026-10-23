@@ -8,7 +8,11 @@ dan soft-delete percakapan.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+import os
+import re
+import subprocess
+import tempfile
+from fastapi import APIRouter, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from ...core.errors import ChatError, EnvelopeRoute, ErrorCode
@@ -83,3 +87,38 @@ async def archive_conversation(conversation_id: str, session: SessionDep) -> JSO
         status_code=status.HTTP_200_OK,
         content={"conversation_id": conversation_id, "archived": True},
     )
+
+
+@router.get("/tts")
+async def text_to_speech(
+    text: str = Query(..., max_length=1500),
+    persona: str = Query(default="nozomi"),
+) -> Response:
+    """Sintesis audio WAV lokal langsung dari mesin Linux via espeak-ng."""
+    clean = re.sub(r"[*_#`~>\[\]()]", " ", text)
+    clean = re.sub(r"https?://\S+", "", clean).strip()
+    if not clean:
+        return Response(content=b"", media_type="audio/wav")
+
+    voice = "id+f3" if persona == "nozomi" else "id+m3"
+    pitch = "82" if persona == "nozomi" else "45"
+    speed = "145" if persona == "nozomi" else "135"
+
+    fd, path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    try:
+        cmd = ["espeak-ng", "-v", voice, "-p", pitch, "-s", speed, "-w", path, clean[:800]]
+        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        if proc.returncode == 0 and os.path.exists(path):
+            with open(path, "rb") as f:
+                data = f.read()
+            return Response(content=data, media_type="audio/wav")
+    except Exception:
+        pass
+    finally:
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    return Response(content=b"", media_type="audio/wav", status_code=status.HTTP_200_OK)

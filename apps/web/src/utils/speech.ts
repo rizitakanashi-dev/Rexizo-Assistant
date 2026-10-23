@@ -105,19 +105,21 @@ export function playRexizoChime(persona: VoicePersona = 'nozomi') {
   }
 }
 
+let currentAudioInstance: HTMLAudioElement | null = null
+
 // Text-to-Speech Engine
 export function speakRexizo(
   text: string,
   options?: Partial<VoiceSettings>,
   onEnd?: () => void
 ) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+  if (typeof window === 'undefined') {
     onEnd?.()
     return
   }
 
   try {
-    window.speechSynthesis.cancel()
+    stopRexizoSpeech()
 
     // Clean text for speech
     const cleanText = text
@@ -132,8 +134,29 @@ export function speakRexizo(
     }
 
     const currentSettings = { ...loadVoiceSettings(), ...options }
+    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : []
+
+    // Fallback otomatis ke backend native audio jika browser tidak memiliki voice engine
+    if (voices.length === 0 || !('speechSynthesis' in window)) {
+      const ttsUrl = `/api/v1/chat/tts?text=${encodeURIComponent(cleanText)}&persona=${currentSettings.persona}`
+      const audio = new Audio(ttsUrl)
+      currentAudioInstance = audio
+      audio.onended = () => {
+        currentAudioInstance = null
+        onEnd?.()
+      }
+      audio.onerror = () => {
+        currentAudioInstance = null
+        onEnd?.()
+      }
+      audio.play().catch(() => {
+        currentAudioInstance = null
+        onEnd?.()
+      })
+      return
+    }
+
     const utterance = new SpeechSynthesisUtterance(cleanText)
-    const voices = window.speechSynthesis.getVoices()
 
     let selectedVoice: SpeechSynthesisVoice | undefined
 
@@ -210,6 +233,15 @@ export function speakRexizo(
 }
 
 export function stopRexizoSpeech() {
+  if (currentAudioInstance) {
+    try {
+      currentAudioInstance.pause()
+      currentAudioInstance.currentTime = 0
+    } catch {
+      // ignore
+    }
+    currentAudioInstance = null
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel()
   }
