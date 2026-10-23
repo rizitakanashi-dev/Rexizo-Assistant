@@ -124,9 +124,38 @@ async def text_to_speech(
                 if resp.status_code == 200:
                     return Response(content=resp.content, media_type="audio/mpeg")
         except Exception:
-            pass  # Fallback ke audio lokal espeak-ng
+            pass  # Fallback ke Edge TTS / local
 
-    # 2. Local fallback via espeak-ng di Arch Linux
+    # 2. Free Neural TTS via edge-tts (100% Gratis, Tanpa Langganan, Suara Anime / Alami Jernih)
+    try:
+        import edge_tts
+
+        if persona == "nozomi":
+            # Suara cewek anime manis dan ceria
+            voice_name = "id-ID-GadisNeural"
+            p_val = "+22Hz"
+            r_val = "+6%"
+        elif persona == "rexizo":
+            voice_name = "id-ID-ArdiNeural"
+            p_val = "-4Hz"
+            r_val = "+2%"
+        else:
+            voice_name = "id-ID-GadisNeural"
+            p_val = "+0Hz"
+            r_val = "+0%"
+
+        communicate = edge_tts.Communicate(clean[:1000], voice_name, pitch=p_val, rate=r_val)
+        audio_buffer = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_buffer += chunk["data"]
+
+        if audio_buffer:
+            return Response(content=audio_buffer, media_type="audio/mpeg")
+    except Exception:
+        pass  # Fallback ke offline espeak-ng jika jaringan terputus
+
+    # 3. Offline local fallback via espeak-ng di Arch Linux
     voice = "id+f3" if persona == "nozomi" else "id+m3"
     pitch = "82" if persona == "nozomi" else "45"
     speed = "145" if persona == "nozomi" else "135"
