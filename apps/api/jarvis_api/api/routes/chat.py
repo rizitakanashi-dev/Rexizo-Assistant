@@ -12,7 +12,7 @@ import os
 import re
 import subprocess
 import tempfile
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from ...core.errors import ChatError, EnvelopeRoute, ErrorCode
@@ -89,18 +89,24 @@ async def archive_conversation(conversation_id: str, session: SessionDep) -> JSO
     )
 
 
-@router.get("/tts")
+@router.api_route("/tts", methods=["GET", "HEAD"])
 async def text_to_speech(
-    text: str = Query(..., max_length=1500),
+    request: Request,
+    text: str = Query(default="", max_length=1500),
     persona: str = Query(default="nozomi"),
     voice_id: str | None = Query(default=None),
 ) -> Response:
     """Sintesis audio menggunakan Voice Cloning (ElevenLabs / Fish Audio) bila dikonfigurasi,
-    atau fallback otomatis ke espeak-ng lokal Linux."""
+    atau fallback otomatis ke Edge Neural TTS / espeak-ng."""
+    audio_headers = {"Accept-Ranges": "bytes"}
+
+    if request.method == "HEAD":
+        return Response(content=b"", media_type="audio/mpeg", headers=audio_headers)
+
     clean = re.sub(r"[*_#`~>\[\]()]", " ", text)
     clean = re.sub(r"https?://\S+", "", clean).strip()
     if not clean:
-        return Response(content=b"", media_type="audio/wav")
+        return Response(content=b"", media_type="audio/wav", headers=audio_headers)
 
     from ...core.config import get_settings
     settings = get_settings()
@@ -124,7 +130,7 @@ async def text_to_speech(
             async with httpx.AsyncClient(timeout=12.0) as client:
                 resp = await client.post(url, headers=headers, json=body)
                 if resp.status_code == 200:
-                    return Response(content=resp.content, media_type="audio/mpeg")
+                    return Response(content=resp.content, media_type="audio/mpeg", headers=audio_headers)
         except Exception:
             pass  # Fallback ke ElevenLabs / Edge TTS / local
 
@@ -145,7 +151,7 @@ async def text_to_speech(
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(url, headers=headers, json=body)
                 if resp.status_code == 200:
-                    return Response(content=resp.content, media_type="audio/mpeg")
+                    return Response(content=resp.content, media_type="audio/mpeg", headers=audio_headers)
         except Exception:
             pass  # Fallback ke Edge TTS / local
 
@@ -183,7 +189,7 @@ async def text_to_speech(
                 audio_buffer += chunk["data"]
 
         if audio_buffer:
-            return Response(content=audio_buffer, media_type="audio/mpeg")
+            return Response(content=audio_buffer, media_type="audio/mpeg", headers=audio_headers)
     except Exception:
         pass  # Fallback ke offline espeak-ng jika jaringan terputus
 
@@ -200,7 +206,7 @@ async def text_to_speech(
         if proc.returncode == 0 and os.path.exists(path):
             with open(path, "rb") as f:
                 data = f.read()
-            return Response(content=data, media_type="audio/wav")
+            return Response(content=data, media_type="audio/wav", headers=audio_headers)
     except Exception:
         pass
     finally:
@@ -209,4 +215,4 @@ async def text_to_speech(
                 os.remove(path)
             except OSError:
                 pass
-    return Response(content=b"", media_type="audio/wav", status_code=status.HTTP_200_OK)
+    return Response(content=b"", media_type="audio/wav", status_code=status.HTTP_200_OK, headers=audio_headers)

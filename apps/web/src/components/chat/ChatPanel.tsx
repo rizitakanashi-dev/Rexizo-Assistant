@@ -60,6 +60,8 @@ export function ChatPanel() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [data, send.isPending])
 
+  const lastSpokenIdRef = useRef<string | null>(null)
+
   const handleSendWithText = useCallback(
     async (textToSend: string) => {
       const text = textToSend.trim()
@@ -68,13 +70,29 @@ export function ChatPanel() {
       stopRexizoSpeech()
       setSpeakingId(null)
       try {
-        await send.mutateAsync({ message: text, client_message_id: clientId })
+        const res = await send.mutateAsync({ message: text, client_message_id: clientId })
         setClientId(newId())
+        if (res?.reply && voiceEnabled) {
+          const msgId = res.message_id || res.reply
+          lastSpokenIdRef.current = msgId
+          playRexizoChime(voiceSettings.persona)
+          setSpeakingId(msgId)
+          speakRexizo(res.reply, voiceSettings, () => {
+            setSpeakingId(null)
+            if (voiceSettings.continuousMode) {
+              setTimeout(() => {
+                playRexizoChime(voiceSettings.persona)
+                setIsListening(true)
+                recognizerRef.current?.start()
+              }, 500)
+            }
+          })
+        }
       } catch {
         setInput(text)
       }
     },
-    [clientId, send]
+    [clientId, send, voiceEnabled, voiceSettings]
   )
 
   useEffect(() => {
@@ -109,8 +127,6 @@ export function ChatPanel() {
       stopRexizoSpeech()
     }
   }, [voiceSettings.continuousMode, handleSendWithText])
-
-  const lastSpokenIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (send.data?.reply && voiceEnabled) {

@@ -278,12 +278,21 @@ export function createSpeechRecognizer(
   }
 
   const recognition = new SpeechRecognition()
-  recognition.continuous = false
-  recognition.interimResults = false
-  recognition.lang = navigator.language || 'id-ID'
+  recognition.continuous = true
+  recognition.interimResults = true
+  recognition.lang = navigator.language?.startsWith('id') ? 'id-ID' : 'id-ID'
 
   recognition.onresult = (event: any) => {
-    const transcript = event.results[0]?.[0]?.transcript || ''
+    let finalTranscript = ''
+    let interimTranscript = ''
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript
+      } else {
+        interimTranscript += event.results[i][0].transcript
+      }
+    }
+    const transcript = (finalTranscript || interimTranscript).trim()
     if (transcript) {
       onResult(transcript)
     }
@@ -295,8 +304,8 @@ export function createSpeechRecognizer(
 
   recognition.onerror = (err: any) => {
     const errorType = err?.error || 'unknown_error'
+    console.warn('Speech recognition error:', errorType, err)
     onError?.(errorType)
-    onEnd()
   }
 
   return {
