@@ -118,6 +118,8 @@ export function ChatPanel() {
     }
   }, [send.data, voiceEnabled, voiceSettings])
 
+  const messages = data?.messages ?? []
+
   const handleSend = () => handleSendWithText(input)
 
   const handleToggleMic = () => {
