@@ -105,7 +105,30 @@ async def text_to_speech(
     from ...core.config import get_settings
     settings = get_settings()
 
-    # 1. Cloud Voice Cloning (ElevenLabs) jika API key & Voice ID tersedia
+    # 1. Fish Audio S2.1 Pro Free (Voice Cloning Gratis untuk Developer)
+    if settings.fish_audio_api_key:
+        try:
+            import httpx
+            fish_voice_id = voice_id or settings.fish_audio_voice_id or "933563129e564b19a115bedd57b7406a"
+            url = "https://api.fish.audio/v1/tts"
+            headers = {
+                "Authorization": f"Bearer {settings.fish_audio_api_key}",
+                "Content-Type": "application/json",
+            }
+            body = {
+                "text": clean[:1000],
+                "reference_id": fish_voice_id,
+                "format": "mp3",
+                "model": "s2.1-pro-free",
+            }
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.post(url, headers=headers, json=body)
+                if resp.status_code == 200:
+                    return Response(content=resp.content, media_type="audio/mpeg")
+        except Exception:
+            pass  # Fallback ke ElevenLabs / Edge TTS / local
+
+    # 2. Cloud Voice Cloning (ElevenLabs) jika API key & Voice ID tersedia
     target_voice_id = voice_id or settings.elevenlabs_voice_id
     if settings.elevenlabs_api_key and target_voice_id:
         try:

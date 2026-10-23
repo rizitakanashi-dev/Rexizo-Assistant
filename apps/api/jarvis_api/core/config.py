@@ -91,13 +91,29 @@ class Settings(BaseSettings):
         default="eleven_multilingual_v2",
         validation_alias=AliasChoices("ELEVENLABS_MODEL_ID"),
     )
+    fish_audio_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FISH_AUDIO_API_KEY", "FISH_API_KEY"),
+    )
+    fish_audio_voice_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FISH_AUDIO_VOICE_ID", "FISH_VOICE_ID", "FISH_AUDIO_REFERENCE_ID"),
+    )
 
-    @field_validator("dattio_api_key", "dattio_base_url", "dattio_model", "elevenlabs_api_key", "elevenlabs_voice_id", mode="before")
+    @field_validator(
+        "dattio_api_key",
+        "dattio_base_url",
+        "dattio_model",
+        "elevenlabs_api_key",
+        "elevenlabs_voice_id",
+        "fish_audio_api_key",
+        "fish_audio_voice_id",
+        mode="before",
+    )
     @classmethod
     def _strip_empty_llm_fields(cls, v: Any) -> Any:
         if isinstance(v, str) and not v.strip():
             return None
-        return v
         return v
 
     # --- Guardrail AI Core -------------------------------------------------
