@@ -1,42 +1,46 @@
-# JARVIS — Local Intelligent Assistant
+# Rexizo — Local Intelligent Assistant
 
 A local-first AI assistant with surveillance capabilities.
 
 ## Initial scope
-- Text-based AI assistant
-- Camera monitoring through RTSP
+- Text & voice-based AI assistant (Movie Persona)
+- Camera monitoring through local webcam & RTSP
 - Motion detection
 - Event log and notifications
-- Local dashboard
+- Local web dashboard
 - Conversation and event history
 
-## Planned stack
-- React + TypeScript + MUI
+## Stack
+- React + TypeScript + MUI (Graphite on warm paper design)
 - Python + FastAPI
 - OpenCV
 - SQLite
-- Dattio AI for LLM inference
+- OpenRouter / Dattio AI for LLM inference
 
 ---
 
 ## Status
 
-Repo berada pada **Fase 4 ROADMAP** (Implementasi AI Core & Surveillance Service). Backend FastAPI, AI Core
-(tool registry + Dattio AI client), dan surveillance service sudah terimplementasi serta lolos **77 test otomatis**.
-Dashboard React/MUI (Fase 5) belum ada.
+Stack backend FastAPI, AI Core (tool registry + OpenRouter LLM client), surveillance service, dan dashboard React/MUI sudah terimplementasi serta lolos **90 backend pytest tests** dan **33 frontend vitest tests**.
 
-## Menjalankan backend secara lokal
+## Menjalankan stack secara lokal
 
 ```bash
+# 1. Backend FastAPI
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-cp .env.example .env          # isi DATTIO_API_KEY / DATTIO_BASE_URL / DATTIO_MODEL untuk LLM nyata
+cp .env.example .env          # isi OPENROUTER_API_KEY
 .venv/bin/uvicorn jarvis_api.main:app --reload --host 127.0.0.1 --port 8000
+
+# 2. Frontend React
+cd apps/web
+npm install
+npm run dev
 ```
 
-- Tanpa kredensial Dattio, backend otomatis berjalan dalam **TEST MODE** (provider LLM offline, tanpa traffic keluar).
-- Feed kamera default bersifat sintetis (`JARVIS_MOCK_CAMERA_FEED=true`); surveillance worker auto-start saat lifespan aktif.
-- Auth opsional: isi `JARVIS_API_KEY` untuk header `X-JARVIS-API-KEY`; bila kosong, hanya host loopback yang diizinkan.
+- Kamera fisik lokal (`/dev/video0`) otomatis dideteksi dan dapat distream secara langsung.
+- Tanpa API Key, backend berjalan dalam **TEST MODE** (provider LLM offline, tanpa traffic keluar).
+- Auth opsional: isi `REXIZO_API_KEY` untuk header `X-REXIZO-API-KEY`; bila kosong, hanya host loopback yang diizinkan.
 - Dokumentasi OpenAPI interaktif: <http://127.0.0.1:8000/docs>.
 
 ## Endpoint utama
@@ -50,15 +54,18 @@ cp .env.example .env          # isi DATTIO_API_KEY / DATTIO_BASE_URL / DATTIO_MO
 | GET | `/api/v1/cameras/{id}/stream` | Aliran MJPEG kamera |
 | GET | `/api/v1/events` | Halaman event dengan filter/paginasi |
 | GET | `/api/v1/events/{id}/snapshot` | Snapshot event |
-| POST | `/api/v1/chat/messages` | Chat JARVIS (tool-first, jawaban berbasis data lokal) |
+| POST | `/api/v1/chat/messages` | Chat Rexizo (tool-first, jawaban berbasis data lokal) |
 | GET | `/api/v1/chat/history` | Riwayat percakapan |
 | WS | `/ws/events` | Broadcast event & perubahan status kamera |
 
 ## Uji
 
 ```bash
-.venv/bin/python -m pytest -q            # 77 test
-.venv/bin/ruff check . && .venv/bin/ruff format --check .
+# Backend tests
+.venv/bin/pytest tests/
+
+# Frontend tests
+cd apps/web && npm run test
 ```
 
 ## Documentation

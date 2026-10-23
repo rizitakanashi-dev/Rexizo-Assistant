@@ -24,7 +24,7 @@ router = APIRouter(prefix="/chat", tags=["chat"], route_class=EnvelopeRoute)
 async def send_message(
     payload: ChatRequest, session: SessionDep, chat_service: ChatServiceDep
 ) -> ChatResponse:
-    """Kirim pesan teks ke JARVIS dan dapatkan jawaban berbasis data lokal."""
+    """Kirim pesan teks ke Rexizo dan dapatkan jawaban berbasis data lokal."""
     return await chat_service.send_message(
         session,
         payload.conversation_id,

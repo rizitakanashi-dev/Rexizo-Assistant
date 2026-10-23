@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const API_KEY = env.JARVIS_API_KEY ?? ''
+  const API_KEY = env.REXIZO_API_KEY ?? env.JARVIS_API_KEY ?? ''
 
   return {
     plugins: [react()],
@@ -21,7 +21,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
-              if (API_KEY) proxyReq.setHeader('X-JARVIS-API-KEY', API_KEY)
+              if (API_KEY) {
+                proxyReq.setHeader('X-REXIZO-API-KEY', API_KEY)
+                proxyReq.setHeader('X-JARVIS-API-KEY', API_KEY)
+              }
             })
           },
         },
@@ -34,7 +37,10 @@ export default defineConfig(({ mode }) => {
             // Browser tidak bisa mengirim header custom pada handshake WS,
             // jadi API key disuntik di sisi dev-server — tidak pernah masuk bundle.
             proxy.on('proxyReqWs', (proxyReq) => {
-              if (API_KEY) proxyReq.setHeader('X-JARVIS-API-KEY', API_KEY)
+              if (API_KEY) {
+                proxyReq.setHeader('X-REXIZO-API-KEY', API_KEY)
+                proxyReq.setHeader('X-JARVIS-API-KEY', API_KEY)
+              }
             })
           },
         },

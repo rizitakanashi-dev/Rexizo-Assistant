@@ -1,11 +1,11 @@
 /**
- * JARVIS Audio & Speech Synthesis / Recognition Utilities
- * Memberikan pengalaman suara interaktif khas J.A.R.V.I.S. (Iron Man)
+ * Rexizo Audio & Speech Synthesis / Recognition Utilities
+ * Memberikan pengalaman suara interaktif asisten cerdas Rexizo
  * langsung di peramban tanpa dependensi eksternal.
  */
 
 // Web Audio API Sound Chime
-export function playJarvisChime() {
+export function playRexizoChime() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     if (!AudioContextClass) return
@@ -42,8 +42,8 @@ export function playJarvisChime() {
   }
 }
 
-// Text-to-Speech (JARVIS Butler voice)
-export function speakJarvis(text: string, onEnd?: () => void) {
+// Text-to-Speech (Rexizo voice)
+export function speakRexizo(text: string, onEnd?: () => void) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     onEnd?.()
     return
@@ -66,7 +66,7 @@ export function speakJarvis(text: string, onEnd?: () => void) {
     const utterance = new SpeechSynthesisUtterance(cleanText)
     const voices = window.speechSynthesis.getVoices()
 
-    // Prefer British English voice for the authentic JARVIS tone if available
+    // Prefer British English voice for the authentic refined tone if available
     const britishVoice = voices.find(
       (v) =>
         v.lang.includes('en-GB') ||
@@ -102,11 +102,16 @@ export function speakJarvis(text: string, onEnd?: () => void) {
   }
 }
 
-export function stopJarvisSpeech() {
+export function stopRexizoSpeech() {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     window.speechSynthesis.cancel()
   }
 }
+
+// Kompatibilitas alias
+export const playJarvisChime = playRexizoChime
+export const speakJarvis = speakRexizo
+export const stopJarvisSpeech = stopRexizoSpeech
 
 // Speech Recognition (Voice Input)
 export interface SpeechRecognitionController {

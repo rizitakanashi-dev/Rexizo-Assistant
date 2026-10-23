@@ -26,7 +26,11 @@ LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost", "testclient"}
 async def events_socket(websocket: WebSocket) -> None:
     """Koneksi WebSocket dua arah untuk update event real-time."""
     settings = websocket.app.state.settings
-    api_key = websocket.query_params.get("api_key") or websocket.headers.get("x-jarvis-api-key")
+    api_key = (
+        websocket.query_params.get("api_key")
+        or websocket.headers.get("x-rexizo-api-key")
+        or websocket.headers.get("x-jarvis-api-key")
+    )
 
     if settings.api_key:
         if not api_key or not hmac.compare_digest(api_key, settings.api_key):

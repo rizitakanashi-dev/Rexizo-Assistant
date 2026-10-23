@@ -56,6 +56,7 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 
 async def require_api_key(
     request: Request,
+    x_rexizo_api_key: Annotated[str | None, Header(alias="X-REXIZO-API-KEY")] = None,
     x_jarvis_api_key: Annotated[str | None, Header(alias="X-JARVIS-API-KEY")] = None,
 ) -> None:
     """Melindungi API: API key bila dikonfigurasi, selain itu hanya localhost.
@@ -63,8 +64,9 @@ async def require_api_key(
     Prototipe lokal: tanpa API key, akses dibatasi ke klien loopback.
     """
     settings: Settings = request.app.state.settings
+    provided_key = x_rexizo_api_key or x_jarvis_api_key
     if settings.api_key:
-        if not x_jarvis_api_key or not hmac.compare_digest(x_jarvis_api_key, settings.api_key):
+        if not provided_key or not hmac.compare_digest(provided_key, settings.api_key):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="API key tidak valid"
             )

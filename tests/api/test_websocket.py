@@ -86,6 +86,13 @@ def test_websocket_auth_required_when_configured(settings) -> None:
             ws.send_text("ping")
             assert ws.receive_json()["event"] == "PONG"
 
+        # Header x-rexizo-api-key works
+        with client.websocket_connect(
+            "/ws/events", headers={"X-REXIZO-API-KEY": "secret123"}
+        ) as ws:
+            ws.send_text("ping")
+            assert ws.receive_json()["event"] == "PONG"
+
 
 def test_websocket_catchup_since(surveillance_client: TestClient, app_with_surveillance) -> None:
     runtime = app_with_surveillance.state.surveillance.runtime

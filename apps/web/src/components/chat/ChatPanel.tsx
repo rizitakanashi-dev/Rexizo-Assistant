@@ -27,9 +27,9 @@ import {
 } from '@/utils/contract'
 import {
   createSpeechRecognizer,
-  playJarvisChime,
-  speakJarvis,
-  stopJarvisSpeech,
+  playRexizoChime,
+  speakRexizo,
+  stopRexizoSpeech,
 } from '@/utils/speech'
 
 function newId() {
@@ -67,15 +67,15 @@ export function ChatPanel() {
     )
     return () => {
       recognizerRef.current?.stop()
-      stopJarvisSpeech()
+      stopRexizoSpeech()
     }
   }, [])
 
   useEffect(() => {
     if (send.data?.reply && voiceEnabled) {
-      playJarvisChime()
+      playRexizoChime()
       setSpeakingId(send.data.message_id || 'latest')
-      speakJarvis(send.data.reply, () => setSpeakingId(null))
+      speakRexizo(send.data.reply, () => setSpeakingId(null))
     }
   }, [send.data, voiceEnabled])
 
@@ -85,7 +85,7 @@ export function ChatPanel() {
     const text = input.trim()
     if (!text || send.isPending) return
     setInput('')
-    stopJarvisSpeech()
+    stopRexizoSpeech()
     setSpeakingId(null)
     try {
       await send.mutateAsync({ message: text, client_message_id: clientId })
@@ -104,7 +104,7 @@ export function ChatPanel() {
       recognizerRef.current.stop()
       setIsListening(false)
     } else {
-      playJarvisChime()
+      playRexizoChime()
       setIsListening(true)
       recognizerRef.current.start()
     }
@@ -112,10 +112,10 @@ export function ChatPanel() {
 
   const handleToggleVoice = () => {
     if (!voiceEnabled) {
-      playJarvisChime()
+      playRexizoChime()
       setVoiceEnabled(true)
     } else {
-      stopJarvisSpeech()
+      stopRexizoSpeech()
       setSpeakingId(null)
       setVoiceEnabled(false)
     }
@@ -123,13 +123,13 @@ export function ChatPanel() {
 
   const handleSpeakMessage = (id: string, text: string) => {
     if (speakingId === id) {
-      stopJarvisSpeech()
+      stopRexizoSpeech()
       setSpeakingId(null)
     } else {
-      stopJarvisSpeech()
-      playJarvisChime()
+      stopRexizoSpeech()
+      playRexizoChime()
       setSpeakingId(id)
-      speakJarvis(text, () => setSpeakingId(null))
+      speakRexizo(text, () => setSpeakingId(null))
     }
   }
 
@@ -148,7 +148,7 @@ export function ChatPanel() {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="body1" sx={{ fontWeight: 600, color: '#0d0d0d', fontSize: '15px' }}>
-            J.A.R.V.I.S.
+            R.E.X.I.Z.O.
           </Typography>
           <Chip
             label="Movie Persona"
@@ -166,7 +166,7 @@ export function ChatPanel() {
           <Typography variant="caption" sx={{ color: '#5d5d5d', fontSize: '12px' }}>
             ● online
           </Typography>
-          <Tooltip title={voiceEnabled ? 'Matikan suara respons JARVIS' : 'Aktifkan suara respons JARVIS (Iron Man TTS)'}>
+          <Tooltip title={voiceEnabled ? 'Matikan suara respons Rexizo' : 'Aktifkan suara respons Rexizo (TTS)'}>
             <IconButton
               size="small"
               onClick={handleToggleVoice}
@@ -227,7 +227,7 @@ export function ChatPanel() {
               Kamera lokal dan sensor pengawas aktif siaga. Tanyakan apa pun seperti di film:
             </Typography>
             {[
-              'Halo JARVIS, laporkan status diagnostik sistem saat ini',
+              'Halo Rexizo, laporkan status diagnostik sistem saat ini',
               'Apakah ada pergerakan atau orang terdeteksi hari ini?',
               'Tampilkan seluruh kamera pengawas yang aktif',
             ].map((q) => (
@@ -323,7 +323,7 @@ export function ChatPanel() {
                     >
                       {m.content}
                     </Typography>
-                    <Tooltip title="Dengarkan suara J.A.R.V.I.S.">
+                    <Tooltip title="Dengarkan suara Rexizo">
                       <IconButton
                         size="small"
                         onClick={() => handleSpeakMessage(m.id, m.content)}
@@ -353,7 +353,7 @@ export function ChatPanel() {
               }}
             >
               <Typography variant="caption" sx={{ color: '#8f8f8f', fontSize: '13px' }}>
-                JARVIS sedang memproses data...
+                Rexizo sedang memproses data...
               </Typography>
             </Paper>
           )}
@@ -411,7 +411,7 @@ export function ChatPanel() {
                   >
                     {send.data.reply}
                   </Typography>
-                  <Tooltip title="Dengarkan suara J.A.R.V.I.S.">
+                  <Tooltip title="Dengarkan suara Rexizo">
                     <IconButton
                       size="small"
                       onClick={() => handleSpeakMessage(send.data.message_id || 'latest', send.data.reply)}
@@ -560,7 +560,7 @@ export function ChatPanel() {
             }}
             fullWidth
           />
-          <Tooltip title={isListening ? 'Berhenti mendengarkan' : 'Bicara ke JARVIS (Voice Input)'}>
+          <Tooltip title={isListening ? 'Berhenti mendengarkan' : 'Bicara ke Rexizo (Voice Input)'}>
             <IconButton
               size="small"
               onClick={handleToggleMic}

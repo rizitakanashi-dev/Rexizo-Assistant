@@ -96,3 +96,7 @@ def test_api_key_is_required_when_configured(settings: Settings) -> None:
             "/api/v1/cameras", headers={"X-JARVIS-API-KEY": "rahasia-local"}
         )
         assert response.status_code == 200
+        response_rexizo = secured_client.get(
+            "/api/v1/cameras", headers={"X-REXIZO-API-KEY": "rahasia-local"}
+        )
+        assert response_rexizo.status_code == 200

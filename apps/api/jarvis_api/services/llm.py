@@ -407,7 +407,7 @@ class FakeProvider:
         if tool_name is None:
             return LLMResponse(
                 content=(
-                    "At your service, Sir. J.A.R.V.I.S. online. Semua sensor perimeter dan kamera pengawas berada dalam kondisi siaga. Ada yang bisa saya bantu?"
+                    "At your service, Sir. REXIZO online. Semua sensor perimeter dan kamera pengawas berada dalam kondisi siaga. Ada yang bisa saya bantu?"
                 )
             )
         return LLMResponse(

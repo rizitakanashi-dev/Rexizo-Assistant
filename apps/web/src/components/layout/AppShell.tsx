@@ -54,7 +54,7 @@ function SideNavContent({ onClose }: { onClose?: () => void }) {
         }}
       >
         <Typography variant="body1" sx={{ fontWeight: 600, color: '#0d0d0d', letterSpacing: '0px' }}>
-          JARVIS
+          REXIZO
         </Typography>
         <Chip
           label="v0.1"
@@ -149,7 +149,7 @@ function SideNavContent({ onClose }: { onClose?: () => void }) {
             <ChatIcon fontSize="small" sx={{ color: '#0d0d0d' }} />
           </ListItemIcon>
           <ListItemText
-            primary="Asisten JARVIS"
+            primary="Asisten REXIZO"
             secondary="Buka chat"
             primaryTypographyProps={{ fontSize: '13px', fontWeight: 500, color: '#0d0d0d' }}
             secondaryTypographyProps={{ fontSize: '12px', color: '#8f8f8f' }}
@@ -241,7 +241,7 @@ export function AppShell({ children }: PropsWithChildren) {
             <StatusStrip />
           </Box>
 
-          <Tooltip title="Buka Asisten JARVIS">
+          <Tooltip title="Buka Asisten REXIZO">
             <IconButton
               size="small"
               onClick={toggleChat}
