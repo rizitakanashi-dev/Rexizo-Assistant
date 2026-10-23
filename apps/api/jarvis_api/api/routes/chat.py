@@ -154,10 +154,19 @@ async def text_to_speech(
         import edge_tts
 
         if persona == "nozomi":
-            # Suara cewek anime manis dan ceria
-            voice_name = "id-ID-GadisNeural"
-            p_val = "+22Hz"
-            r_val = "+6%"
+            # Cek apakah teks mengandung huruf Jepang (hiragana/katakana/kanji)
+            has_japanese = bool(re.search(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]", clean))
+            if has_japanese:
+                # Karakter suara anime Jepang NanamiNeural (identik dengan gaya Tachibana Nozomi)
+                voice_name = "ja-JP-NanamiNeural"
+                p_val = "+16Hz"
+                r_val = "-3%"
+            else:
+                # Kalibrasi presisi berdasarkan file audio Nozomi yang diunggah pengguna:
+                # Nada tinggi lembut manis (+28Hz) dan tempo santai manja (-4%)
+                voice_name = "id-ID-GadisNeural"
+                p_val = "+28Hz"
+                r_val = "-4%"
         elif persona == "rexizo":
             voice_name = "id-ID-ArdiNeural"
             p_val = "-4Hz"

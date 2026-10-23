@@ -134,10 +134,10 @@ export function speakRexizo(
     }
 
     const currentSettings = { ...loadVoiceSettings(), ...options }
-    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : []
 
-    // Fallback otomatis ke backend native audio jika browser tidak memiliki voice engine
-    if (voices.length === 0 || !('speechSynthesis' in window)) {
+    // Gunakan backend native Neural Audio TTS (Nozomi calibrated) secara default
+    // Browser SpeechSynthesis hanya dipakai jika user secara spesifik memilih voice engine lokal di dialog.
+    if (!currentSettings.voiceURI) {
       const ttsUrl = `/api/v1/chat/tts?text=${encodeURIComponent(cleanText)}&persona=${currentSettings.persona}`
       const audio = new Audio(ttsUrl)
       currentAudioInstance = audio
@@ -145,17 +145,20 @@ export function speakRexizo(
         currentAudioInstance = null
         onEnd?.()
       }
-      audio.onerror = () => {
+      audio.onerror = (err) => {
+        console.warn('Audio TTS playback error:', err)
         currentAudioInstance = null
         onEnd?.()
       }
-      audio.play().catch(() => {
+      audio.play().catch((err) => {
+        console.warn('Audio play() auto-playback error:', err)
         currentAudioInstance = null
         onEnd?.()
       })
       return
     }
 
+    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : []
     const utterance = new SpeechSynthesisUtterance(cleanText)
 
     let selectedVoice: SpeechSynthesisVoice | undefined

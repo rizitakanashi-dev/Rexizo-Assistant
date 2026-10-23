@@ -110,10 +110,16 @@ export function ChatPanel() {
     }
   }, [voiceSettings.continuousMode, handleSendWithText])
 
+  const lastSpokenIdRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (send.data?.reply && voiceEnabled) {
+      const msgId = send.data.message_id || send.data.reply
+      if (lastSpokenIdRef.current === msgId) return
+      lastSpokenIdRef.current = msgId
+
       playRexizoChime(voiceSettings.persona)
-      setSpeakingId(send.data.message_id || 'latest')
+      setSpeakingId(msgId)
       speakRexizo(send.data.reply, voiceSettings, () => {
         setSpeakingId(null)
         // Hands-Free / Continuous voice interaction
