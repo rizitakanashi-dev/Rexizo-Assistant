@@ -93,13 +93,40 @@ async def archive_conversation(conversation_id: str, session: SessionDep) -> JSO
 async def text_to_speech(
     text: str = Query(..., max_length=1500),
     persona: str = Query(default="nozomi"),
+    voice_id: str | None = Query(default=None),
 ) -> Response:
-    """Sintesis audio WAV lokal langsung dari mesin Linux via espeak-ng."""
+    """Sintesis audio menggunakan Voice Cloning (ElevenLabs / Fish Audio) bila dikonfigurasi,
+    atau fallback otomatis ke espeak-ng lokal Linux."""
     clean = re.sub(r"[*_#`~>\[\]()]", " ", text)
     clean = re.sub(r"https?://\S+", "", clean).strip()
     if not clean:
         return Response(content=b"", media_type="audio/wav")
 
+    from ...core.config import get_settings
+    settings = get_settings()
+
+    # 1. Cloud Voice Cloning (ElevenLabs) jika API key & Voice ID tersedia
+    target_voice_id = voice_id or settings.elevenlabs_voice_id
+    if settings.elevenlabs_api_key and target_voice_id:
+        try:
+            import httpx
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{target_voice_id}?output_format=mp3_44100_128"
+            headers = {
+                "xi-api-key": settings.elevenlabs_api_key,
+                "Content-Type": "application/json",
+            }
+            body = {
+                "text": clean[:1000],
+                "model_id": settings.elevenlabs_model_id or "eleven_multilingual_v2",
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(url, headers=headers, json=body)
+                if resp.status_code == 200:
+                    return Response(content=resp.content, media_type="audio/mpeg")
+        except Exception:
+            pass  # Fallback ke audio lokal espeak-ng
+
+    # 2. Local fallback via espeak-ng di Arch Linux
     voice = "id+f3" if persona == "nozomi" else "id+m3"
     pitch = "82" if persona == "nozomi" else "45"
     speed = "145" if persona == "nozomi" else "135"

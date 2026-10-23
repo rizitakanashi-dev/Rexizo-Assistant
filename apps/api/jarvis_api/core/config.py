@@ -78,11 +78,26 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DATTIO_TEMPERATURE", "JARVIS_DATTIO_TEMPERATURE"),
     )
 
-    @field_validator("dattio_api_key", "dattio_base_url", "dattio_model", mode="before")
+    # --- Cloud Voice Cloning (ElevenLabs / Fish Audio) ---------------------
+    elevenlabs_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ELEVENLABS_API_KEY", "REXIZO_ELEVENLABS_API_KEY"),
+    )
+    elevenlabs_voice_id: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ELEVENLABS_VOICE_ID", "REXIZO_ELEVENLABS_VOICE_ID"),
+    )
+    elevenlabs_model_id: str = Field(
+        default="eleven_multilingual_v2",
+        validation_alias=AliasChoices("ELEVENLABS_MODEL_ID"),
+    )
+
+    @field_validator("dattio_api_key", "dattio_base_url", "dattio_model", "elevenlabs_api_key", "elevenlabs_voice_id", mode="before")
     @classmethod
     def _strip_empty_llm_fields(cls, v: Any) -> Any:
         if isinstance(v, str) and not v.strip():
             return None
+        return v
         return v
 
     # --- Guardrail AI Core -------------------------------------------------
