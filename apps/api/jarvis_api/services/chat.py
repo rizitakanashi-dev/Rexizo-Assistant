@@ -148,7 +148,14 @@ class ChatService:
 
         history = await chat_repo.history(conversation_key, limit=self._history_limit)
         messages: list[dict[str, Any]] = [{"role": "system", "content": build_system_prompt()}]
-        messages.extend({"role": item.role, "content": item.content} for item in history)
+        for item in history:
+            if item.role in {"user", "assistant"}:
+                messages.append({"role": item.role, "content": item.content})
+            elif item.role == "tool":
+                messages.append({
+                    "role": "user",
+                    "content": f"[Hasil Sistem ({item.tool_name or 'tool'})]: {item.content}",
+                })
 
         tool_schemas = self._tool_schemas()
         context = ToolContext(

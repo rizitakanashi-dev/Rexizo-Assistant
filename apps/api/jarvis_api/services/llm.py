@@ -340,6 +340,7 @@ class DattioProvider:
                 status_code=400,
             )
         if response.status_code >= 400:
+            logger.error("Provider LLM %s status %d: %s", self._model, response.status_code, response.text)
             raise ProviderError(
                 f"Provider LLM merespons dengan status {response.status_code}.",
                 kind="upstream",
