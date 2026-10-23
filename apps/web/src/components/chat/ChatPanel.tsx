@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -51,6 +52,7 @@ export function ChatPanel() {
   const [isListening, setIsListening] = useState(false)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const recognizerRef = useRef<ReturnType<typeof createSpeechRecognizer> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -80,6 +82,7 @@ export function ChatPanel() {
       (transcript) => {
         setInput(transcript)
         setIsListening(false)
+        setVoiceError(null)
         // Auto-send in continuous mode if non-empty
         if (voiceSettings.continuousMode && transcript.trim()) {
           setTimeout(() => {
@@ -90,8 +93,15 @@ export function ChatPanel() {
       () => {
         setIsListening(false)
       },
-      () => {
+      (err: string) => {
         setIsListening(false)
+        if (err === 'not-allowed') {
+          setVoiceError('Izin mikrofon diblokir. Klik ikon setelan di address bar dan izinkan Mikrofon.')
+        } else if (err === 'network' || err === 'service-not-allowed') {
+          setVoiceError('Brave Browser memblokir Speech API secara default. Buka brave://settings/privacy dan aktifkan "Use Google services for push messaging and speech", atau gunakan browser Chrome.')
+        } else if (err !== 'no-speech' && err !== 'aborted') {
+          setVoiceError(`Voice input error (${err}). Pastikan mikrofon aktif.`)
+        }
       }
     )
     return () => {
@@ -596,6 +606,15 @@ export function ChatPanel() {
       {/* Input Box — styled with Voice & Send Controls */}
       <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.1)' }} />
       <Box sx={{ p: 2, bgcolor: '#ffffff' }}>
+        {voiceError && (
+          <Alert
+            severity="warning"
+            onClose={() => setVoiceError(null)}
+            sx={{ mb: 1.5, fontSize: '12px', py: 0.25 }}
+          >
+            {voiceError}
+          </Alert>
+        )}
         <Box
           sx={{
             display: 'flex',
@@ -613,7 +632,13 @@ export function ChatPanel() {
         >
           <TextField
             variant="standard"
-            placeholder={isListening ? 'Mendengarkan suara Anda...' : 'Bicara atau ketik perintah ke J.A.R.V.I.S.…'}
+            placeholder={
+              isListening
+                ? 'Mendengarkan suara Anda...'
+                : voiceSettings.persona === 'nozomi'
+                  ? 'Ketik atau bicara ke Nozomi…'
+                  : 'Bicara atau ketik perintah ke Rexizo…'
+            }
             value={input}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
             onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {

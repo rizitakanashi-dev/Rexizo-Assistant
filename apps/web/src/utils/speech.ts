@@ -53,6 +53,9 @@ export function playRexizoChime(persona: VoicePersona = 'nozomi') {
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     if (!AudioContextClass) return
     const ctx = new AudioContextClass()
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
     const now = ctx.currentTime
 
     if (persona === 'nozomi') {
@@ -197,6 +200,9 @@ export function speakRexizo(
     utterance.onend = () => onEnd?.()
     utterance.onerror = () => onEnd?.()
 
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+    }
     window.speechSynthesis.speak(utterance)
   } catch {
     onEnd?.()
@@ -223,7 +229,7 @@ export interface SpeechRecognitionController {
 export function createSpeechRecognizer(
   onResult: (text: string) => void,
   onEnd: () => void,
-  onError?: (error: unknown) => void
+  onError?: (error: string) => void
 ): SpeechRecognitionController {
   if (typeof window === 'undefined') {
     return { start: () => {}, stop: () => {}, isSupported: false }
@@ -253,7 +259,8 @@ export function createSpeechRecognizer(
   }
 
   recognition.onerror = (err: any) => {
-    onError?.(err)
+    const errorType = err?.error || 'unknown_error'
+    onError?.(errorType)
     onEnd()
   }
 

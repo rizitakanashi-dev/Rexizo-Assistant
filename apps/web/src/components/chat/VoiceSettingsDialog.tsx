@@ -243,7 +243,7 @@ export function VoiceSettingsDialog({ open, onClose, onSettingsChanged }: Props)
           </Box>
 
           {/* Voice Engine selection */}
-          {availableVoices.length > 0 && (
+          {availableVoices.length > 0 ? (
             <FormControl fullWidth size="small">
               <InputLabel sx={{ fontSize: '12px' }}>Pilihan Voice Engine Browser</InputLabel>
               <Select
@@ -262,6 +262,19 @@ export function VoiceSettingsDialog({ open, onClose, onSettingsChanged }: Props)
                 ))}
               </Select>
             </FormControl>
+          ) : (
+            <Box
+              sx={{
+                p: 1.25,
+                borderRadius: '8px',
+                bgcolor: '#fff8e1',
+                border: '1px solid #ffe082',
+              }}
+            >
+              <Typography sx={{ fontSize: '11.5px', color: '#b78103', lineHeight: 1.4 }}>
+                💡 <b>Info Audio Linux:</b> Browser belum mendeteksi voice engine TTS lokal. Di Arch Linux, jalankan <code>sudo pacman -S speech-dispatcher</code> lalu restart browser agar suara speech browser aktif.
+              </Typography>
+            </Box>
           )}
 
           {/* Test Voice Button */}
