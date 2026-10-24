@@ -1,7 +1,8 @@
 /**
  * Rexizo Audio & Speech Synthesis / Recognition Engine
  * Mendukung kustomisasi suara anime Tachibana Nozomi (Blue Archive),
- * J.A.R.V.I.S. butler, custom Web Speech API, dan continuous voice conversation.
+ * J.A.R.V.I.S. butler, Web Audio API bebas blokir autoplay,
+ * serta Voice Input (MediaRecorder + Backend STT) yang 100% kompatibel di Brave & Arch Linux.
  */
 
 export type VoicePersona = 'nozomi' | 'rexizo' | 'custom'
@@ -45,21 +46,53 @@ export function saveVoiceSettings(settings: VoiceSettings) {
   }
 }
 
-// Web Audio API Sound Chimes
-export function playRexizoChime(persona: VoicePersona = 'nozomi') {
+// Shared Web Audio API Context (tetap unlocked setelah interaksi pertama user)
+let sharedAudioCtx: AudioContext | null = null
+let currentBufferSource: AudioBufferSourceNode | null = null
+let currentAudioInstance: HTMLAudioElement | null = null
+let activeSpeechAbort: AbortController | null = null
+
+export function getUnlockedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
   try {
     const AudioContextClass =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    if (!AudioContextClass) return
-    const ctx = new AudioContextClass()
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {})
+    if (!AudioContextClass) return null
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioContextClass()
     }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {})
+    }
+    return sharedAudioCtx
+  } catch {
+    return null
+  }
+}
+
+// Auto-unlock AudioContext pada klik atau ketikan pertama di halaman
+if (typeof window !== 'undefined') {
+  const unlockHandler = () => {
+    const ctx = getUnlockedAudioContext()
+    if (ctx && ctx.state === 'running') {
+      window.removeEventListener('pointerdown', unlockHandler)
+      window.removeEventListener('keydown', unlockHandler)
+    }
+  }
+  window.addEventListener('pointerdown', unlockHandler, { passive: true })
+  window.addEventListener('keydown', unlockHandler, { passive: true })
+}
+
+// Web Audio API Sound Chimes
+export function playRexizoChime(persona: VoicePersona = 'nozomi') {
+  try {
+    const ctx = getUnlockedAudioContext()
+    if (!ctx) return
     const now = ctx.currentTime
 
     if (persona === 'nozomi') {
-      // 🌸 Sparkle Anime Chime (G5 -> C6 -> E6 harmonic triad)
+      // Sparkle Anime Chime (G5 -> C6 -> E6 harmonic triad)
       const notes = [783.99, 1046.5, 1318.51]
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator()
@@ -75,7 +108,7 @@ export function playRexizoChime(persona: VoicePersona = 'nozomi') {
         osc.stop(now + idx * 0.06 + 0.36)
       })
     } else {
-      // 🎩 Holographic Butler HUD Chime (D5 -> A5)
+      // Holographic Butler HUD Chime (D5 -> A5)
       const osc1 = ctx.createOscillator()
       const gain1 = ctx.createGain()
       osc1.type = 'sine'
@@ -105,9 +138,18 @@ export function playRexizoChime(persona: VoicePersona = 'nozomi') {
   }
 }
 
-let currentAudioInstance: HTMLAudioElement | null = null
+function cleanTextForSpeech(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_#`~>]/g, ' ')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{1FA00}-\u{1FAFF}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
-// Text-to-Speech Engine
+// Text-to-Speech Engine (Menggunakan Web Audio API agar tidak pernah diblokir autoplay setelah delay LLM)
 export function speakRexizo(
   text: string,
   options?: Partial<VoiceSettings>,
@@ -118,111 +160,144 @@ export function speakRexizo(
     return
   }
 
+  stopRexizoSpeech()
+
+  const cleanText = cleanTextForSpeech(text)
+  if (!cleanText) {
+    onEnd?.()
+    return
+  }
+
+  const currentSettings = { ...loadVoiceSettings(), ...options }
+
+  // Gunakan backend Neural Audio TTS (Nozomi calibrated) secara default
+  if (!currentSettings.voiceURI) {
+    const abortCtrl = new AbortController()
+    activeSpeechAbort = abortCtrl
+    const params = new URLSearchParams({
+      text: cleanText,
+      persona: currentSettings.persona,
+      pitch: String(currentSettings.pitch ?? 1.35),
+      rate: String(currentSettings.rate ?? 1.05),
+    })
+    const ttsUrl = `/api/v1/chat/tts?${params.toString()}`
+
+    ;(async () => {
+      try {
+        const res = await fetch(ttsUrl, { signal: abortCtrl.signal })
+        if (!res.ok) throw new Error(`TTS HTTP ${res.status}`)
+        const arrayBuf = await res.arrayBuffer()
+        if (abortCtrl.signal.aborted || arrayBuf.byteLength < 64) {
+          onEnd?.()
+          return
+        }
+
+        // Putar melalui sharedAudioCtx (bebas blokir autoplay walau respons LLM > 5 detik)
+        const ctx = getUnlockedAudioContext()
+        if (ctx) {
+          try {
+            if (ctx.state === 'suspended') {
+              await ctx.resume()
+            }
+            const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0))
+            if (abortCtrl.signal.aborted) {
+              onEnd?.()
+              return
+            }
+            const source = ctx.createBufferSource()
+            const gainNode = ctx.createGain()
+            gainNode.gain.value = Math.max(0.1, Math.min(2.0, currentSettings.volume ?? 1.0))
+            source.buffer = audioBuffer
+            source.connect(gainNode)
+            gainNode.connect(ctx.destination)
+            currentBufferSource = source
+            source.onended = () => {
+              if (currentBufferSource === source) {
+                currentBufferSource = null
+              }
+              onEnd?.()
+            }
+            source.start(0)
+            return
+          } catch (decodeErr) {
+            console.warn('WebAudio decode fallback ke HTML5 Audio:', decodeErr)
+          }
+        }
+
+        // Fallback ke HTML5 Audio Blob
+        const blob = new Blob([arrayBuf], { type: res.headers.get('content-type') || 'audio/mpeg' })
+        const blobUrl = URL.createObjectURL(blob)
+        const audio = new Audio(blobUrl)
+        audio.volume = Math.max(0.1, Math.min(1.0, currentSettings.volume ?? 1.0))
+        currentAudioInstance = audio
+        const cleanup = () => {
+          URL.revokeObjectURL(blobUrl)
+          if (currentAudioInstance === audio) currentAudioInstance = null
+        }
+        audio.onended = () => {
+          cleanup()
+          onEnd?.()
+        }
+        audio.onerror = () => {
+          cleanup()
+          speakWithBrowserSynthesis(cleanText, currentSettings, onEnd)
+        }
+        await audio.play()
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return
+        }
+        console.warn('Backend TTS gagal, beralih ke browser speechSynthesis:', err)
+        speakWithBrowserSynthesis(cleanText, currentSettings, onEnd)
+      }
+    })()
+    return
+  }
+
+  speakWithBrowserSynthesis(cleanText, currentSettings, onEnd)
+}
+
+function speakWithBrowserSynthesis(
+  cleanText: string,
+  currentSettings: VoiceSettings,
+  onEnd?: () => void
+) {
   try {
-    stopRexizoSpeech()
-
-    // Clean text for speech
-    const cleanText = text
-      .replace(/[*_#`~>]/g, '')
-      .replace(/https?:\/\/\S+/g, '')
-      .replace(/\[.*?\]\(.*?\)/g, '')
-      .trim()
-
-    if (!cleanText) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       onEnd?.()
       return
     }
-
-    const currentSettings = { ...loadVoiceSettings(), ...options }
-
-    // Gunakan backend native Neural Audio TTS (Nozomi calibrated) secara default
-    // Browser SpeechSynthesis hanya dipakai jika user secara spesifik memilih voice engine lokal di dialog.
-    if (!currentSettings.voiceURI) {
-      const ttsUrl = `/api/v1/chat/tts?text=${encodeURIComponent(cleanText)}&persona=${currentSettings.persona}`
-      const audio = new Audio(ttsUrl)
-      currentAudioInstance = audio
-      audio.onended = () => {
-        currentAudioInstance = null
-        onEnd?.()
-      }
-      audio.onerror = (err) => {
-        console.warn('Audio TTS playback error:', err)
-        currentAudioInstance = null
-        onEnd?.()
-      }
-      audio.play().catch((err) => {
-        console.warn('Audio play() auto-playback error:', err)
-        currentAudioInstance = null
-        onEnd?.()
-      })
-      return
-    }
-
-    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : []
+    const voices = window.speechSynthesis.getVoices()
     const utterance = new SpeechSynthesisUtterance(cleanText)
 
     let selectedVoice: SpeechSynthesisVoice | undefined
-
     if (currentSettings.voiceURI) {
       selectedVoice = voices.find((v) => v.voiceURI === currentSettings.voiceURI)
     }
 
     if (!selectedVoice) {
       if (currentSettings.persona === 'nozomi') {
-        // Tachibana Nozomi prefers Japanese anime-friendly voices or high clear female voice
         const jaVoice = voices.find(
           (v) =>
             v.lang.startsWith('ja') ||
             v.name.includes('Japanese') ||
             v.name.includes('Kyoko') ||
-            v.name.includes('Nanami') ||
-            v.name.includes('Otoya')
-        )
-        const femaleVoice = voices.find(
-          (v) =>
-            (v.name.toLowerCase().includes('female') ||
-              v.name.toLowerCase().includes('girl') ||
-              v.name.toLowerCase().includes('samantha') ||
-              v.name.toLowerCase().includes('victoria') ||
-              v.name.toLowerCase().includes('zira')) &&
-            !v.name.toLowerCase().includes('male')
+            v.name.includes('Nanami')
         )
         const idVoice = voices.find((v) => v.lang.startsWith('id'))
-        selectedVoice = jaVoice || femaleVoice || idVoice || voices[0]
-      } else if (currentSettings.persona === 'rexizo') {
-        // Rexizo butler voice
-        const britishVoice = voices.find(
-          (v) =>
-            v.lang.includes('en-GB') ||
-            v.name.toLowerCase().includes('british') ||
-            v.name.toLowerCase().includes('uk english') ||
-            v.name.toLowerCase().includes('daniel')
-        )
-        const idVoice = voices.find((v) => v.lang.includes('id'))
-        selectedVoice = britishVoice || idVoice || voices[0]
+        selectedVoice = jaVoice || idVoice || voices[0]
       } else {
-        selectedVoice = voices[0]
+        const idVoice = voices.find((v) => v.lang.includes('id'))
+        selectedVoice = idVoice || voices[0]
       }
     }
 
     if (selectedVoice) {
       utterance.voice = selectedVoice
     }
-
-    // Set pitch & rate based on persona
-    if (currentSettings.persona === 'nozomi') {
-      utterance.pitch = currentSettings.pitch ?? 1.35
-      utterance.rate = currentSettings.rate ?? 1.05
-    } else if (currentSettings.persona === 'rexizo') {
-      utterance.pitch = currentSettings.pitch ?? 0.95
-      utterance.rate = currentSettings.rate ?? 1.02
-    } else {
-      utterance.pitch = currentSettings.pitch ?? 1.0
-      utterance.rate = currentSettings.rate ?? 1.0
-    }
-
+    utterance.pitch = currentSettings.pitch ?? (currentSettings.persona === 'nozomi' ? 1.35 : 0.95)
+    utterance.rate = currentSettings.rate ?? (currentSettings.persona === 'nozomi' ? 1.05 : 1.02)
     utterance.volume = currentSettings.volume ?? 1.0
-
     utterance.onend = () => onEnd?.()
     utterance.onerror = () => onEnd?.()
 
@@ -236,6 +311,24 @@ export function speakRexizo(
 }
 
 export function stopRexizoSpeech() {
+  if (activeSpeechAbort) {
+    try {
+      activeSpeechAbort.abort()
+    } catch {
+      // ignore
+    }
+    activeSpeechAbort = null
+  }
+  if (currentBufferSource) {
+    try {
+      currentBufferSource.onended = null
+      currentBufferSource.stop()
+      currentBufferSource.disconnect()
+    } catch {
+      // ignore
+    }
+    currentBufferSource = null
+  }
   if (currentAudioInstance) {
     try {
       currentAudioInstance.pause()
@@ -246,7 +339,11 @@ export function stopRexizoSpeech() {
     currentAudioInstance = null
   }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    window.speechSynthesis.cancel()
+    try {
+      window.speechSynthesis.cancel()
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -254,7 +351,8 @@ export const playJarvisChime = playRexizoChime
 export const speakJarvis = speakRexizo
 export const stopJarvisSpeech = stopRexizoSpeech
 
-// Speech Recognition (Voice Input)
+// Speech Recognition (Voice Input) — MediaRecorder + VAD + Backend STT (/api/v1/chat/stt)
+// Bekerja 100% di Brave Browser, Chromium, dan Firefox di Arch Linux tanpa terputus otomatis.
 export interface SpeechRecognitionController {
   start: () => void
   stop: () => void
@@ -270,57 +368,192 @@ export function createSpeechRecognizer(
     return { start: () => {}, stop: () => {}, isSupported: false }
   }
 
+  const hasMediaDevices = Boolean(
+    navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function'
+  )
   const SpeechRecognition =
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 
-  if (!SpeechRecognition) {
+  const isSupported = hasMediaDevices || Boolean(SpeechRecognition)
+  if (!isSupported) {
     return { start: () => {}, stop: () => {}, isSupported: false }
   }
 
-  const recognition = new SpeechRecognition()
-  recognition.continuous = true
-  recognition.interimResults = true
-  recognition.lang = navigator.language?.startsWith('id') ? 'id-ID' : 'id-ID'
+  let mediaRecorder: MediaRecorder | null = null
+  let mediaStream: MediaStream | null = null
+  let vadInterval: ReturnType<typeof setInterval> | null = null
+  let maxDurationTimer: ReturnType<typeof setTimeout> | null = null
+  let isRecording = false
 
-  recognition.onresult = (event: any) => {
-    let finalTranscript = ''
-    let interimTranscript = ''
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) {
-        finalTranscript += event.results[i][0].transcript
-      } else {
-        interimTranscript += event.results[i][0].transcript
+  const cleanupMedia = () => {
+    if (vadInterval) {
+      clearInterval(vadInterval)
+      vadInterval = null
+    }
+    if (maxDurationTimer) {
+      clearTimeout(maxDurationTimer)
+      maxDurationTimer = null
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((t) => {
+        try {
+          t.stop()
+        } catch {
+          // ignore
+        }
+      })
+      mediaStream = null
+    }
+    mediaRecorder = null
+    isRecording = false
+  }
+
+  const startMediaRecorderStt = async () => {
+    if (isRecording) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
+      mediaStream = stream
+      isRecording = true
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/ogg')
+            ? 'audio/ogg'
+            : ''
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      mediaRecorder = recorder
+      const chunks: BlobPart[] = []
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          chunks.push(ev.data)
+        }
       }
-    }
-    const transcript = (finalTranscript || interimTranscript).trim()
-    if (transcript) {
-      onResult(transcript)
-    }
-  }
 
-  recognition.onend = () => {
-    onEnd()
-  }
+      recorder.onstop = async () => {
+        cleanupMedia()
+        const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
+        if (blob.size < 200) {
+          onEnd()
+          return
+        }
+        try {
+          const resp = await fetch('/api/v1/chat/stt?lang=id-ID', {
+            method: 'POST',
+            headers: { 'Content-Type': blob.type || 'application/octet-stream' },
+            body: blob,
+          })
+          if (resp.ok) {
+            const data = (await resp.json()) as { text?: string }
+            const transcript = (data.text || '').trim()
+            if (transcript) {
+              onResult(transcript)
+            } else {
+              onError?.('no-speech')
+            }
+          } else {
+            onError?.('stt-server-error')
+          }
+        } catch (err) {
+          console.warn('Backend STT error:', err)
+          onError?.('network')
+        } finally {
+          onEnd()
+        }
+      }
 
-  recognition.onerror = (err: any) => {
-    const errorType = err?.error || 'unknown_error'
-    console.warn('Speech recognition error:', errorType, err)
-    onError?.(errorType)
+      recorder.start(200)
+
+      // Deteksi keheningan otomatis (Voice Activity Detection) via Web Audio AnalyserNode
+      const ctx = getUnlockedAudioContext()
+      if (ctx) {
+        try {
+          const source = ctx.createMediaStreamSource(stream)
+          const analyser = ctx.createAnalyser()
+          analyser.fftSize = 512
+          source.connect(analyser)
+          const dataArray = new Uint8Array(analyser.fftSize)
+          let hasSpoken = false
+          let lastSpeechTime = Date.now()
+          const startedAt = Date.now()
+
+          vadInterval = setInterval(() => {
+            if (!isRecording || !mediaRecorder || mediaRecorder.state !== 'recording') return
+            analyser.getByteTimeDomainData(dataArray)
+            let sumSquares = 0
+            for (let i = 0; i < dataArray.length; i++) {
+              const norm = (dataArray[i] - 128) / 128
+              sumSquares += norm * norm
+            }
+            const rms = Math.sqrt(sumSquares / dataArray.length)
+            const now = Date.now()
+
+            if (rms > 0.02) {
+              hasSpoken = true
+              lastSpeechTime = now
+            } else if (hasSpoken && now - lastSpeechTime > 1600) {
+              // Otomatis berhenti & transkripsi setelah 1.6 detik hening usai berbicara
+              if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop()
+              }
+            } else if (!hasSpoken && now - startedAt > 8000) {
+              // Otomatis berhenti jika 8 detik tidak ada suara sama sekali
+              if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop()
+              }
+            }
+          }, 100)
+        } catch {
+          // Abaikan jika analyser gagal
+        }
+      }
+
+      // Batas maksimum 15 detik per rekaman kalimat
+      maxDurationTimer = setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop()
+        }
+      }, 15000)
+    } catch (err: any) {
+      cleanupMedia()
+      const name = err?.name || ''
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        onError?.('not-allowed')
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        onError?.('audio-capture')
+      } else {
+        onError?.(err?.message || 'mic-error')
+      }
+      onEnd()
+    }
   }
 
   return {
     start: () => {
-      try {
-        recognition.start()
-      } catch {
-        // already active
+      if (hasMediaDevices) {
+        startMediaRecorderStt()
       }
     },
     stop: () => {
-      try {
-        recognition.stop()
-      } catch {
-        // already stopped
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        try {
+          mediaRecorder.stop()
+        } catch {
+          cleanupMedia()
+          onEnd()
+        }
+      } else {
+        cleanupMedia()
+        onEnd()
       }
     },
     isSupported: true,

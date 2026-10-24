@@ -29,6 +29,7 @@ import {
 } from '@/utils/contract'
 import {
   createSpeechRecognizer,
+  getUnlockedAudioContext,
   loadVoiceSettings,
   playRexizoChime,
   speakRexizo,
@@ -53,6 +54,7 @@ export function ChatPanel() {
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [lastFailedText, setLastFailedText] = useState('')
   const recognizerRef = useRef<ReturnType<typeof createSpeechRecognizer> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -66,12 +68,15 @@ export function ChatPanel() {
     async (textToSend: string) => {
       const text = textToSend.trim()
       if (!text || send.isPending) return
+      getUnlockedAudioContext()
       setInput('')
+      setLastFailedText(text)
       stopRexizoSpeech()
       setSpeakingId(null)
       try {
         const res = await send.mutateAsync({ message: text, client_message_id: clientId })
         setClientId(newId())
+        setLastFailedText('')
         if (res?.reply && voiceEnabled) {
           const msgId = res.message_id || res.reply
           lastSpokenIdRef.current = msgId
@@ -84,7 +89,7 @@ export function ChatPanel() {
                 playRexizoChime(voiceSettings.persona)
                 setIsListening(true)
                 recognizerRef.current?.start()
-              }, 500)
+              }, 400)
             }
           })
         }
@@ -98,14 +103,14 @@ export function ChatPanel() {
   useEffect(() => {
     recognizerRef.current = createSpeechRecognizer(
       (transcript) => {
-        setInput(transcript)
         setIsListening(false)
         setVoiceError(null)
-        // Auto-send in continuous mode if non-empty
-        if (voiceSettings.continuousMode && transcript.trim()) {
+        const cleaned = transcript.trim()
+        if (cleaned) {
+          setInput(cleaned)
           setTimeout(() => {
-            handleSendWithText(transcript.trim())
-          }, 300)
+            handleSendWithText(cleaned)
+          }, 150)
         }
       },
       () => {
@@ -114,11 +119,13 @@ export function ChatPanel() {
       (err: string) => {
         setIsListening(false)
         if (err === 'not-allowed') {
-          setVoiceError('Izin mikrofon diblokir. Klik ikon setelan di address bar dan izinkan Mikrofon.')
-        } else if (err === 'network' || err === 'service-not-allowed') {
-          setVoiceError('Brave Browser memblokir Speech API secara default. Buka brave://settings/privacy dan aktifkan "Use Google services for push messaging and speech", atau gunakan browser Chrome.')
-        } else if (err !== 'no-speech' && err !== 'aborted') {
-          setVoiceError(`Voice input error (${err}). Pastikan mikrofon aktif.`)
+          setVoiceError('Izin mikrofon diblokir. Klik ikon gembok/setelan di address bar dan izinkan Mikrofon.')
+        } else if (err === 'audio-capture') {
+          setVoiceError('Perangkat mikrofon tidak ditemukan di sistem Arch Linux.')
+        } else if (err === 'no-speech') {
+          setVoiceError('Suara tidak terdengar jelas. Silakan bicara lebih dekat ke mikrofon.')
+        } else if (err !== 'aborted') {
+          setVoiceError(`Gagal memproses input suara (${err}). Pastikan mikrofon aktif.`)
         }
       }
     )
@@ -127,28 +134,6 @@ export function ChatPanel() {
       stopRexizoSpeech()
     }
   }, [voiceSettings.continuousMode, handleSendWithText])
-
-  useEffect(() => {
-    if (send.data?.reply && voiceEnabled) {
-      const msgId = send.data.message_id || send.data.reply
-      if (lastSpokenIdRef.current === msgId) return
-      lastSpokenIdRef.current = msgId
-
-      playRexizoChime(voiceSettings.persona)
-      setSpeakingId(msgId)
-      speakRexizo(send.data.reply, voiceSettings, () => {
-        setSpeakingId(null)
-        // Hands-Free / Continuous voice interaction
-        if (voiceSettings.continuousMode) {
-          setTimeout(() => {
-            playRexizoChime(voiceSettings.persona)
-            setIsListening(true)
-            recognizerRef.current?.start()
-          }, 500)
-        }
-      })
-    }
-  }, [send.data, voiceEnabled, voiceSettings])
 
   const messages = data?.messages ?? []
 
@@ -479,9 +464,7 @@ export function ChatPanel() {
                     size="small"
                     variant="outlined"
                     sx={{ mt: 1, borderColor: 'rgba(0, 0, 0, 0.15)', color: '#0d0d0d' }}
-                    onClick={() =>
-                      send.mutate({ message: input || '', client_message_id: clientId })
-                    }
+                    onClick={() => handleSendWithText(input || lastFailedText)}
                   >
                     Coba lagi
                   </Button>

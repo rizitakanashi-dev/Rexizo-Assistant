@@ -223,8 +223,11 @@ class DattioProvider:
                 data = await self._post_with_retry(payload)
             else:
                 self._consecutive_failures += 1
+                if self._consecutive_failures >= self._circuit_failures:
+                    self._circuit_open_until = time.monotonic() + self._circuit_cooldown
                 raise exc
         self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
         return self._parse(data)
 
     def _build_payload(
@@ -383,6 +386,11 @@ class DattioProvider:
             parsed = parse_tool_call_from_text(content)
             if parsed is not None:
                 tool_calls.append(parsed)
+                cleaned = _XML_TOOL_CALL.sub("", content)
+                cleaned = _TOOL_CALL_BLOCK.sub("", cleaned).strip()
+                if cleaned.startswith("{") and cleaned.endswith("}"):
+                    cleaned = ""
+                content = cleaned or None
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         return LLMResponse(content=content, tool_calls=tool_calls, raw=data, usage=usage)
 

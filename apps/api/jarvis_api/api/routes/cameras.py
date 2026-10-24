@@ -92,7 +92,7 @@ async def camera_snapshot(camera_id: str, surveillance: SurveillanceDep) -> Resp
 
 @router.get("/{camera_id}/stream", dependencies=[ApiKeyDep])
 async def camera_stream(
-    camera_id: str, surveillance: SurveillanceDep
+    camera_id: str, request: fastapi.Request, surveillance: SurveillanceDep
 ) -> fastapi.responses.StreamingResponse:
     """Stream MJPEG langsung dari frame worker kamera."""
     if surveillance.runtime.worker_status(camera_id) is None:
@@ -100,6 +100,8 @@ async def camera_stream(
 
     async def frame_generator():
         while True:
+            if await request.is_disconnected():
+                break
             frame = surveillance.latest_frame(camera_id)
             if frame is not None:
                 success, buffer = cv2.imencode(".jpg", frame)

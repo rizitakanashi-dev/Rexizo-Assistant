@@ -46,16 +46,26 @@ class RtspFrameSource:
         self._next_attempt = 0.0
 
     def _open_capture(self) -> cv2.VideoCapture:
+        import re
+        from pathlib import Path
+
         target: str | int = self._url
         if isinstance(target, str):
             target_str = target.strip()
+            if target_str.startswith("device://"):
+                target_str = target_str.replace("device://", "").strip()
             if target_str.isdigit():
-                target = int(target_str)
-            elif target_str.startswith("device://"):
-                dev_id = target_str.replace("device://", "").strip()
-                target = int(dev_id) if dev_id.isdigit() else dev_id
-            else:
-                target = target_str
+                return cv2.VideoCapture(int(target_str), cv2.CAP_V4L2)
+            v4l_match = re.match(r"^/dev/video(\d+)$", target_str)
+            if v4l_match:
+                if not Path(target_str).exists():
+                    return cv2.VideoCapture()
+                cap = cv2.VideoCapture(int(v4l_match.group(1)), cv2.CAP_V4L2)
+                if cap.isOpened():
+                    return cap
+                cap.release()
+                return cv2.VideoCapture(target_str)
+            target = target_str
         return cv2.VideoCapture(target)
 
     def _ensure_capture(self) -> bool:

@@ -44,15 +44,17 @@ async def list_events(
     event_type: str | None = Query(default=None),
     start_time: datetime | None = Query(default=None),
     end_time: datetime | None = Query(default=None),
+    search: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> EventPage:
-    """Query log event dengan filter kamera, jenis event, dan rentang waktu."""
+    """Query log event dengan filter kamera, jenis event, kata kunci, dan rentang waktu."""
     total, events = await EventRepository(session).query(
         camera_id=camera_id,
         event_type=event_type,
         start_time=start_time,
         end_time=end_time,
+        search=search,
         limit=limit,
         offset=offset,
     )
@@ -73,8 +75,9 @@ async def event_snapshot(event_id: str, session: SessionDep, request: fastapi.Re
             status_code=status.HTTP_404_NOT_FOUND, detail="Snapshot event tidak ditemukan"
         )
     settings = request.app.state.settings
-    snapshot_path = settings.snapshot_dir / event.snapshot_path
-    if not snapshot_path.exists():
+    base_dir = settings.snapshot_dir.resolve()
+    snapshot_path = (base_dir / event.snapshot_path).resolve()
+    if not snapshot_path.is_relative_to(base_dir) or not snapshot_path.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File snapshot tidak ditemukan"
         )

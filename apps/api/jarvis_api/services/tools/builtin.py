@@ -230,20 +230,24 @@ async def _delete_event_history(
 
 APP_COMMAND_MAP: dict[str, list[str]] = {
     "firefox": ["firefox"],
-    "browser": ["firefox", "brave-browser", "chromium"],
-    "web": ["firefox", "brave-browser"],
-    "brave": ["brave-browser"],
-    "chrome": ["google-chrome-stable", "chromium", "brave-browser", "firefox"],
+    "browser": ["firefox", "brave", "brave-browser", "chromium"],
+    "web": ["firefox", "brave", "brave-browser"],
+    "brave": ["brave", "brave-browser", "com.brave.Browser"],
+    "chrome": ["google-chrome-stable", "chromium", "brave", "brave-browser", "firefox"],
     "code": ["code", "code-oss"],
     "vscode": ["code", "code-oss"],
     "vs code": ["code", "code-oss"],
     "visual studio code": ["code", "code-oss"],
-    "discord": ["discord"],
+    "discord": ["discord", "vesktop"],
     "spotify": ["spotify"],
     "steam": ["steam"],
     "telegram": ["telegram-desktop"],
-    "terminal": ["kitty", "foot"],
-    "konsol": ["kitty", "foot"],
+    "obs": ["obs"],
+    "vlc": ["vlc"],
+    "mpv": ["mpv"],
+    "gimp": ["gimp"],
+    "terminal": ["kitty", "foot", "alacritty", "konsole"],
+    "konsol": ["kitty", "foot", "alacritty", "konsole"],
     "kitty": ["kitty"],
     "foot": ["foot"],
     "file manager": ["thunar", "nautilus", "dolphin", "pcmanfm"],
@@ -261,8 +265,8 @@ def _resolve_executable(app_name: str) -> list[str]:
         for c in APP_COMMAND_MAP[key]:
             if shutil.which(c):
                 return [c]
-    first = key.split()[0]
-    if shutil.which(first):
+    first = key.split()[0] if key else ""
+    if first and shutil.which(first):
         return [first]
     if shutil.which("gtk-launch"):
         return ["gtk-launch", key]
@@ -282,7 +286,13 @@ async def _launch_app(params: LaunchAppParams, context: ToolContext) -> dict[str
         if "WAYLAND_DISPLAY" not in env and "DISPLAY" not in env:
             env["WAYLAND_DISPLAY"] = "wayland-1"
             env["DISPLAY"] = ":1"
-        subprocess.Popen(cmd_parts, start_new_session=True, env=env)
+        subprocess.Popen(
+            cmd_parts,
+            start_new_session=True,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         return {
             "status": "launched",
             "app": params.app_name,
@@ -295,79 +305,87 @@ async def _launch_app(params: LaunchAppParams, context: ToolContext) -> dict[str
 
 
 async def _system_control(params: SystemControlParams, context: ToolContext) -> dict[str, Any]:
+    import asyncio
     import os
+    import re
     import shutil
     import subprocess
     act = params.action.strip().lower()
     env = os.environ.copy()
     val = params.value or ""
 
+    async def _run(cmd: list[str]) -> None:
+        await asyncio.to_thread(subprocess.run, cmd, check=False, env=env)
+
     try:
         if act == "volume_up":
             if shutil.which("wpctl"):
-                subprocess.run(["wpctl", "set-volume", "-l", "1.5", "@DEFAULT_AUDIO_SINK@", "5%+"], check=False)
+                await _run(["wpctl", "set-volume", "-l", "1.5", "@DEFAULT_AUDIO_SINK@", "5%+"])
             elif shutil.which("pamixer"):
-                subprocess.run(["pamixer", "-i", "5"], check=False)
+                await _run(["pamixer", "-i", "5"])
             return {"status": "ok", "action": "volume_up", "message": "Volume suara dinaikkan 5%"}
 
         if act == "volume_down":
             if shutil.which("wpctl"):
-                subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"], check=False)
+                await _run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"])
             elif shutil.which("pamixer"):
-                subprocess.run(["pamixer", "-d", "5"], check=False)
+                await _run(["pamixer", "-d", "5"])
             return {"status": "ok", "action": "volume_down", "message": "Volume suara diturunkan 5%"}
 
         if act == "volume_mute":
             if shutil.which("wpctl"):
-                subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], check=False)
+                await _run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
             elif shutil.which("pamixer"):
-                subprocess.run(["pamixer", "-t"], check=False)
+                await _run(["pamixer", "-t"])
             return {"status": "ok", "action": "volume_mute", "message": "Status mute volume di-toggle"}
 
         if act == "set_volume":
-            clean_pct = val.replace("%", "").strip() or "50"
+            m = re.search(r"(\d+(?:\.\d+)?)", val)
+            pct_num = max(0, min(150, int(round(float(m.group(1)))))) if m else 50
             if shutil.which("pamixer"):
-                subprocess.run(["pamixer", "--set-volume", clean_pct], check=False)
+                await _run(["pamixer", "--set-volume", str(min(100, pct_num))])
             elif shutil.which("wpctl"):
-                ratio = float(clean_pct) / 100.0
-                subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(ratio)], check=False)
-            return {"status": "ok", "action": "set_volume", "message": f"Volume diatur ke {clean_pct}%"}
+                ratio = round(pct_num / 100.0, 2)
+                await _run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(ratio)])
+            return {"status": "ok", "action": "set_volume", "message": f"Volume diatur ke {pct_num}%"}
 
         if act == "brightness_up":
             if shutil.which("brightnessctl"):
-                subprocess.run(["brightnessctl", "set", "+10%"], check=False)
+                await _run(["brightnessctl", "set", "+10%"])
             return {"status": "ok", "action": "brightness_up", "message": "Kecerahan layar dinaikkan 10%"}
 
         if act == "brightness_down":
             if shutil.which("brightnessctl"):
-                subprocess.run(["brightnessctl", "set", "10%-"], check=False)
+                await _run(["brightnessctl", "set", "10%-"])
             return {"status": "ok", "action": "brightness_down", "message": "Kecerahan layar diturunkan 10%"}
 
         if act == "set_brightness":
-            clean_pct = val.strip() or "50%"
+            m = re.search(r"(\d+(?:\.\d+)?)", val)
+            pct_num = max(1, min(100, int(round(float(m.group(1)))))) if m else 50
+            clean_pct = f"{pct_num}%"
             if shutil.which("brightnessctl"):
-                subprocess.run(["brightnessctl", "set", clean_pct], check=False)
+                await _run(["brightnessctl", "set", clean_pct])
             return {"status": "ok", "action": "set_brightness", "message": f"Kecerahan layar diatur ke {clean_pct}"}
 
         if act in ("media_play_pause", "media_play", "media_pause"):
             if shutil.which("playerctl"):
                 cmd = "play-pause" if act == "media_play_pause" else act.replace("media_", "")
-                subprocess.run(["playerctl", cmd], check=False)
+                await _run(["playerctl", cmd])
             return {"status": "ok", "action": act, "message": f"Kontrol pemutar musik ({act}) berhasil"}
 
         if act == "media_next":
             if shutil.which("playerctl"):
-                subprocess.run(["playerctl", "next"], check=False)
+                await _run(["playerctl", "next"])
             return {"status": "ok", "action": "media_next", "message": "Memutar lagu berikutnya"}
 
         if act == "media_prev":
             if shutil.which("playerctl"):
-                subprocess.run(["playerctl", "previous"], check=False)
+                await _run(["playerctl", "previous"])
             return {"status": "ok", "action": "media_prev", "message": "Memutar lagu sebelumnya"}
 
         if act == "lock_screen":
             if shutil.which("loginctl"):
-                subprocess.run(["loginctl", "lock-session"], check=False)
+                await _run(["loginctl", "lock-session"])
             elif shutil.which("hyprlock"):
                 subprocess.Popen(["hyprlock"], start_new_session=True, env=env)
             return {"status": "ok", "action": "lock_screen", "message": "Layar sistem dikunci"}
@@ -375,7 +393,7 @@ async def _system_control(params: SystemControlParams, context: ToolContext) -> 
         if act == "notify":
             msg = val or "Pemberitahuan dari Rexizo Assistant"
             if shutil.which("notify-send"):
-                subprocess.run(["notify-send", "Rexizo Assistant", msg], check=False, env=env)
+                await _run(["notify-send", "Rexizo Assistant", msg])
             return {"status": "ok", "action": "notify", "message": f"Notifikasi terkirim: {msg}"}
 
         return {"status": "error", "action": act, "message": f"Aksi kontrol '{act}' tidak dikenali"}
@@ -386,10 +404,12 @@ async def _system_control(params: SystemControlParams, context: ToolContext) -> 
 async def _run_terminal_command(
     params: RunTerminalCommandParams, context: ToolContext
 ) -> dict[str, Any]:
+    import asyncio
     import os
     import subprocess
     try:
-        proc = subprocess.run(
+        proc = await asyncio.to_thread(
+            subprocess.run,
             params.command,
             shell=True,
             capture_output=True,
@@ -413,17 +433,22 @@ async def _run_terminal_command(
 async def _take_screenshot(
     params: TakeScreenshotParams, context: ToolContext
 ) -> dict[str, Any]:
+    import asyncio
     import os
+    import re
     import shutil
     import subprocess
     import time
     from pathlib import Path
-    pictures_dir = Path.home() / "Pictures"
+    pictures_dir = (Path.home() / "Pictures").resolve()
     pictures_dir.mkdir(parents=True, exist_ok=True)
-    fname = params.filename or f"screenshot_{int(time.time())}.png"
-    if not fname.endswith(".png"):
-        fname += ".png"
-    dest = pictures_dir / fname
+    raw_name = Path(params.filename).name if params.filename else f"screenshot_{int(time.time())}.png"
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", raw_name) or f"screenshot_{int(time.time())}.png"
+    if not safe_name.lower().endswith(".png"):
+        safe_name += ".png"
+    dest = (pictures_dir / safe_name).resolve()
+    if not dest.is_relative_to(pictures_dir):
+        return {"status": "error", "message": "Nama file screenshot tidak valid"}
     env = os.environ.copy()
     if "WAYLAND_DISPLAY" not in env and "DISPLAY" not in env:
         env["WAYLAND_DISPLAY"] = "wayland-1"
@@ -431,7 +456,14 @@ async def _take_screenshot(
 
     try:
         if shutil.which("grim"):
-            proc = subprocess.run(["grim", str(dest)], env=env, capture_output=True, text=True)
+            proc = await asyncio.to_thread(
+                subprocess.run,
+                ["grim", str(dest)],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
             if proc.returncode == 0 and dest.exists():
                 return {
                     "status": "success",

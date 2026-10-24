@@ -115,7 +115,8 @@ class SurveillanceService:
             # Auto-register local webcam device if available and not yet registered
             if not self._settings.test_mode:
                 device_path = Path("/dev/video0")
-                if device_path.exists() and await repo.get("cam_device") is None:
+                existing_dev = await repo.get("cam_device")
+                if device_path.exists() and existing_dev is None:
                     logger.info("Perangkat kamera lokal terdeteksi (/dev/video0) — mendaftarkan cam_device")
                     await repo.create(
                         camera_id="cam_device",
@@ -125,6 +126,10 @@ class SurveillanceService:
                         object_detection_enabled=True,
                         is_mock=False,
                     )
+                    cameras = await repo.list()
+                elif not device_path.exists() and existing_dev is not None and existing_dev.rtsp_url == "/dev/video0":
+                    logger.info("Perangkat kamera lokal (/dev/video0) tidak terpasang — menghapus cam_device yang tidak aktif")
+                    await repo.delete("cam_device")
                     cameras = await repo.list()
         specs = [
             CameraSpec(

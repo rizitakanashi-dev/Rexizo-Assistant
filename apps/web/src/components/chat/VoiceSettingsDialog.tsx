@@ -67,7 +67,7 @@ export function VoiceSettingsDialog({ open, onClose, onSettingsChanged }: Props)
   }
 
   const handleSliderChange = (key: 'pitch' | 'rate', val: number) => {
-    const next = { ...settings, [key]: val, persona: 'custom' as VoicePersona }
+    const next = { ...settings, [key]: val }
     setSettings(next)
     saveVoiceSettings(next)
     onSettingsChanged?.(next)
@@ -81,7 +81,7 @@ export function VoiceSettingsDialog({ open, onClose, onSettingsChanged }: Props)
   }
 
   const handleVoiceURIChange = (voiceURI: string) => {
-    const next = { ...settings, voiceURI, persona: 'custom' as VoicePersona }
+    const next = { ...settings, voiceURI }
     setSettings(next)
     saveVoiceSettings(next)
     onSettingsChanged?.(next)

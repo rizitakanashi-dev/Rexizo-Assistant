@@ -100,6 +100,16 @@ export function displayToolName(toolName?: string | null): string {
     get_system_status: 'Status sistem',
     restart_camera_stream: 'Restart stream kamera',
     delete_event_history: 'Hapus riwayat event',
+    launch_application: 'Buka aplikasi Linux',
+    open_app: 'Buka aplikasi Linux',
+    launch_app: 'Buka aplikasi Linux',
+    system_control: 'Kontrol sistem Linux',
+    control_system: 'Kontrol sistem Linux',
+    run_terminal_command: 'Eksekusi perintah terminal',
+    terminal_exec: 'Eksekusi perintah terminal',
+    run_command: 'Eksekusi perintah terminal',
+    take_screenshot: 'Tangkapan layar desktop',
+    screenshot: 'Tangkapan layar desktop',
   }
   if (map[toolName]) return map[toolName]
   return toolName.replace(/_/g, ' ')

@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import AuditLog, Camera, ChatMessage, Conversation, SurveillanceEvent
@@ -77,6 +77,14 @@ class CameraRepository:
         await self._session.refresh(camera)
         return camera
 
+    async def delete(self, camera_id: str) -> bool:
+        camera = await self.get(camera_id)
+        if camera is None:
+            return False
+        await self._session.delete(camera)
+        await self._session.commit()
+        return True
+
 
 class EventRepository:
     """Akses tabel `surveillance_events`."""
@@ -121,6 +129,7 @@ class EventRepository:
         event_type: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        search: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[int, list[SurveillanceEvent]]:
@@ -133,6 +142,15 @@ class EventRepository:
             filters.append(SurveillanceEvent.timestamp >= start_time)
         if end_time:
             filters.append(SurveillanceEvent.timestamp <= end_time)
+        if search and search.strip():
+            q = f"%{search.strip()}%"
+            filters.append(
+                or_(
+                    SurveillanceEvent.camera_name.ilike(q),
+                    SurveillanceEvent.event_type.ilike(q),
+                    SurveillanceEvent.metadata_json.ilike(q),
+                )
+            )
 
         count_result = await self._session.execute(
             select(func.count()).select_from(SurveillanceEvent).where(*filters)
