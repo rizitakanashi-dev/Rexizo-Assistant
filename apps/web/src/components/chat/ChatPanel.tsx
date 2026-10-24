@@ -48,7 +48,7 @@ export function ChatPanel() {
   const { data, isLoading, isError, refetch } = useChatHistory(conversationId)
   const send = useSendMessage(conversationId)
   const [input, setInput] = useState('')
-  const [clientId, setClientId] = useState(newId())
+  const clientIdRef = useRef(newId())
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(loadVoiceSettings())
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [isListening, setIsListening] = useState(false)
@@ -76,8 +76,9 @@ export function ChatPanel() {
       stopRexizoSpeech()
       setSpeakingId(null)
       try {
-        const res = await send.mutateAsync({ message: text, client_message_id: clientId })
-        setClientId(newId())
+        const id = clientIdRef.current
+        clientIdRef.current = newId()
+        const res = await send.mutateAsync({ message: text, client_message_id: id })
         setLastFailedText('')
         if (res?.reply && voiceEnabled) {
           const msgId = res.message_id || res.reply
@@ -99,8 +100,17 @@ export function ChatPanel() {
         setInput(text)
       }
     },
-    [clientId, send, voiceEnabled, voiceSettings]
+    [send, voiceEnabled, voiceSettings]
   )
+
+  const handleSendWithTextRef = useRef(handleSendWithText)
+  handleSendWithTextRef.current = handleSendWithText
+
+  useEffect(() => {
+    return () => {
+      stopRexizoSpeech()
+    }
+  }, [])
 
   useEffect(() => {
     recognizerRef.current = createSpeechRecognizer(
@@ -111,7 +121,7 @@ export function ChatPanel() {
         if (cleaned) {
           setInput(cleaned)
           setTimeout(() => {
-            handleSendWithText(cleaned)
+            handleSendWithTextRef.current(cleaned)
           }, 150)
         }
       },
@@ -133,9 +143,8 @@ export function ChatPanel() {
     )
     return () => {
       recognizerRef.current?.stop()
-      stopRexizoSpeech()
     }
-  }, [voiceSettings.continuousMode, handleSendWithText])
+  }, [voiceSettings.continuousMode])
 
   const messages = data?.messages ?? []
 
