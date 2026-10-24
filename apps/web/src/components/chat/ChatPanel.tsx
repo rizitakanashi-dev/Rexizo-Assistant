@@ -37,6 +37,7 @@ import {
   VoiceSettings,
 } from '@/utils/speech'
 import { VoiceSettingsDialog } from './VoiceSettingsDialog'
+import { VoiceVisualizerAvatar } from './VoiceVisualizerAvatar'
 
 function newId() {
   return `cid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
@@ -53,6 +54,7 @@ export function ChatPanel() {
   const [isListening, setIsListening] = useState(false)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showVisualizerStage, setShowVisualizerStage] = useState(true)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [lastFailedText, setLastFailedText] = useState('')
   const recognizerRef = useRef<ReturnType<typeof createSpeechRecognizer> | null>(null)
@@ -234,6 +236,20 @@ export function ChatPanel() {
               }}
             />
           )}
+          <Tooltip title={showVisualizerStage ? 'Sembunyikan visualizer' : 'Tampilkan panggung avatar visualizer'}>
+            <Box
+              onClick={() => setShowVisualizerStage((prev) => !prev)}
+              sx={{ cursor: 'pointer', ml: 0.5 }}
+            >
+              <VoiceVisualizerAvatar
+                mode="compact"
+                persona={voiceSettings.persona}
+                isSpeaking={Boolean(speakingId)}
+                isListening={isListening}
+                voiceEnabled={voiceEnabled}
+              />
+            </Box>
+          </Tooltip>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Tooltip title="Pengaturan Suara & Karakter (Nozomi / Butler / Hands-Free)">
@@ -617,6 +633,21 @@ export function ChatPanel() {
         </Stack>
         <div ref={bottomRef} />
       </Box>
+
+      {/* Real-time Voice Reactive Avatar & Spectrum Stage */}
+      {showVisualizerStage && (
+        <Box sx={{ px: 2, pt: 1, pb: 0.5, bgcolor: '#ffffff' }}>
+          <VoiceVisualizerAvatar
+            mode="stage"
+            persona={voiceSettings.persona}
+            isSpeaking={Boolean(speakingId)}
+            isListening={isListening}
+            voiceEnabled={voiceEnabled}
+            onToggleVoice={handleToggleVoice}
+            onCloseStage={() => setShowVisualizerStage(false)}
+          />
+        </Box>
+      )}
 
       {/* Input Box — styled with Voice & Send Controls */}
       <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.1)' }} />

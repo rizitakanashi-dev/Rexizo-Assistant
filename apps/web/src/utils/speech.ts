@@ -51,6 +51,56 @@ let sharedAudioCtx: AudioContext | null = null
 let currentBufferSource: AudioBufferSourceNode | null = null
 let currentAudioInstance: HTMLAudioElement | null = null
 let activeSpeechAbort: AbortController | null = null
+let outputAnalyserNode: AnalyserNode | null = null
+let inputAnalyserNode: AnalyserNode | null = null
+
+export interface VoiceVisualizerMetrics {
+  isSpeaking: boolean
+  isListening: boolean
+  volume: number // 0.0 sampai 1.0 (amplitudo suara dinamis)
+  frequencies: Uint8Array // 16 pita frekuensi untuk bar waveform visualizer
+}
+
+const DEFAULT_METRICS: VoiceVisualizerMetrics = {
+  isSpeaking: false,
+  isListening: false,
+  volume: 0,
+  frequencies: new Uint8Array(16),
+}
+
+export function getVoiceVisualizerMetrics(): VoiceVisualizerMetrics {
+  const isSpeaking = Boolean(currentBufferSource || currentAudioInstance)
+  const isListening = Boolean(inputAnalyserNode)
+
+  const activeAnalyser = isSpeaking ? outputAnalyserNode : inputAnalyserNode
+  if (!activeAnalyser) {
+    return { ...DEFAULT_METRICS, isSpeaking, isListening }
+  }
+
+  const freqArray = new Uint8Array(activeAnalyser.frequencyBinCount)
+  activeAnalyser.getByteFrequencyData(freqArray)
+
+  let sum = 0
+  const sampleCount = Math.min(freqArray.length, 48)
+  for (let i = 2; i < sampleCount; i++) {
+    sum += freqArray[i]
+  }
+  const avg = sampleCount > 2 ? sum / (sampleCount - 2) : 0
+  const normalizedVol = Math.min(1.0, Math.max(0.0, avg / 130.0))
+
+  const bars = new Uint8Array(16)
+  const step = Math.max(1, Math.floor(sampleCount / 16))
+  for (let b = 0; b < 16; b++) {
+    bars[b] = freqArray[b * step + 2] || 0
+  }
+
+  return {
+    isSpeaking,
+    isListening,
+    volume: normalizedVol,
+    frequencies: bars,
+  }
+}
 
 export function getUnlockedAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -207,9 +257,15 @@ export function speakRexizo(
             const source = ctx.createBufferSource()
             const gainNode = ctx.createGain()
             gainNode.gain.value = Math.max(0.1, Math.min(2.0, currentSettings.volume ?? 1.0))
+            if (!outputAnalyserNode || outputAnalyserNode.context !== ctx) {
+              outputAnalyserNode = ctx.createAnalyser()
+              outputAnalyserNode.fftSize = 256
+              outputAnalyserNode.smoothingTimeConstant = 0.8
+            }
             source.buffer = audioBuffer
             source.connect(gainNode)
-            gainNode.connect(ctx.destination)
+            gainNode.connect(outputAnalyserNode)
+            outputAnalyserNode.connect(ctx.destination)
             currentBufferSource = source
             source.onended = () => {
               if (currentBufferSource === source) {
@@ -386,6 +442,7 @@ export function createSpeechRecognizer(
   let isRecording = false
 
   const cleanupMedia = () => {
+    inputAnalyserNode = null
     if (vadInterval) {
       clearInterval(vadInterval)
       vadInterval = null
@@ -479,8 +536,10 @@ export function createSpeechRecognizer(
         try {
           const source = ctx.createMediaStreamSource(stream)
           const analyser = ctx.createAnalyser()
-          analyser.fftSize = 512
+          analyser.fftSize = 256
+          analyser.smoothingTimeConstant = 0.75
           source.connect(analyser)
+          inputAnalyserNode = analyser
           const dataArray = new Uint8Array(analyser.fftSize)
           let hasSpoken = false
           let lastSpeechTime = Date.now()
