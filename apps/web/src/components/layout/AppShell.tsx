@@ -25,6 +25,9 @@ import { StatusStrip } from '../status/StatusStrip'
 import { MockBanner } from './MockBanner'
 import { ChatPanel } from '../chat/ChatPanel'
 import { useUiStore } from '@/store/ui'
+import { useSecurityAnnouncer } from '@/hooks/useSecurityAnnouncer'
+import { SecurityAnnouncerButton } from '../security/SecurityAnnouncerButton'
+import { SecurityAnnouncerBanner } from '../security/SecurityAnnouncerBanner'
 
 const NAV_WIDTH = 260
 
@@ -165,9 +168,14 @@ export function AppShell({ children }: PropsWithChildren) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const securityAnnouncer = useSecurityAnnouncer()
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#ffffff' }}>
+      <SecurityAnnouncerBanner
+        alert={securityAnnouncer.activeAlert}
+        onDismiss={securityAnnouncer.dismissAlert}
+      />
       {/* Desktop sidebar */}
       {!isMobile && (
         <Box
@@ -241,25 +249,32 @@ export function AppShell({ children }: PropsWithChildren) {
             <StatusStrip />
           </Box>
 
-          <Tooltip title="Buka Asisten REXIZO">
-            <IconButton
-              size="small"
-              onClick={toggleChat}
-              sx={{
-                color: '#0d0d0d',
-                p: '6px',
-                borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                bgcolor: '#ffffff',
-                '&:hover': {
-                  bgcolor: 'rgba(0, 0, 0, 0.05)',
-                  borderColor: 'rgba(0, 0, 0, 0.2)',
-                },
-              }}
-            >
-              <ChatIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SecurityAnnouncerButton
+              settings={securityAnnouncer.settings}
+              onUpdateSettings={securityAnnouncer.updateSettings}
+              onTestAlert={securityAnnouncer.testAlert}
+            />
+            <Tooltip title="Buka Asisten REXIZO">
+              <IconButton
+                size="small"
+                onClick={toggleChat}
+                sx={{
+                  color: '#0d0d0d',
+                  p: '6px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(0, 0, 0, 0.1)',
+                  bgcolor: '#ffffff',
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 0, 0, 0.05)',
+                    borderColor: 'rgba(0, 0, 0, 0.2)',
+                  },
+                }}
+              >
+                <ChatIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
 
         <MockBanner />

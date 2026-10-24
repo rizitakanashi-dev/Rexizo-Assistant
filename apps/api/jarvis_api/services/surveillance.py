@@ -18,6 +18,7 @@ from ..core.config import Settings
 from ..db.repository import CameraRepository, EventRepository
 from ..db.session import Database
 from .broadcaster import EventBroadcaster
+from .notifier import send_system_notification
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +229,16 @@ class SurveillanceService:
                 metadata=event.metadata,
                 is_mock=event.is_mock,
             )
+        details = ""
+        if isinstance(event.metadata, dict):
+            details = str(event.metadata.get("label") or event.metadata.get("class_name") or "")
+        asyncio.create_task(
+            send_system_notification(
+                camera_name=event.camera_name,
+                event_type=event.event_type,
+                details=details,
+            )
+        )
         await self._broadcaster.broadcast(
             {
                 "event": "NEW_EVENT",
