@@ -594,6 +594,16 @@ export function ChatPanel() {
                         {te.result_summary}
                       </Typography>
                     )}
+                    {te.result && typeof te.result === 'object' && (te.result as any).snapshot_url && (
+                      <Box sx={{ mt: 1, borderRadius: '8px', overflow: 'hidden', maxWidth: 320, border: '1px solid rgba(0, 0, 0, 0.1)' }}>
+                        <Box
+                          component="img"
+                          src={(te.result as any).snapshot_url}
+                          alt="CCTV Frame Snapshot"
+                          sx={{ width: '100%', height: 'auto', display: 'block' }}
+                        />
+                      </Box>
+                    )}
                     {te.error && (
                       <Typography variant="body2" sx={{ mt: 1, fontSize: '13px', color: '#0d0d0d' }}>
                         {te.error}

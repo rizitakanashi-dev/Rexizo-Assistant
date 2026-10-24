@@ -413,6 +413,11 @@ _CONTROL_KEYWORDS = re.compile(
 )
 _SCREENSHOT_KEYWORDS = re.compile(r"\b(screenshot|tangkapan\s+layar|cuplikan\s+layar)\b", re.IGNORECASE)
 _TERMINAL_KEYWORDS = re.compile(r"\b(terminal|bash|shell|perintah|command)\b", re.IGNORECASE)
+_VISION_KEYWORDS = re.compile(
+    r"\b(lihat|tengok|cek|pantau|kondisi|ada\s+siapa|ada\s+apa|visual|situasi)\b.*\b(kamera|camera|cctv|depan|halaman|ruangan)\b|"
+    r"\b(kamera|camera|cctv)\b.*\b(lihat|tengok|cek|pantau|visual|situasi|ada\s+siapa|ada\s+apa)\b",
+    re.IGNORECASE,
+)
 
 
 class FakeProvider:
@@ -476,6 +481,8 @@ class FakeProvider:
     def _pick_tool(self, user_text: str, tools: list[dict[str, Any]] | None) -> str | None:
         available = {tool["function"]["name"] for tool in tools or []}
         candidates: list[str] = []
+        if _VISION_KEYWORDS.search(user_text):
+            candidates.append("inspect_camera_feed")
         if _SCREENSHOT_KEYWORDS.search(user_text):
             candidates.append("take_screenshot")
         if _LAUNCH_KEYWORDS.search(user_text):
@@ -536,6 +543,10 @@ class FakeProvider:
             return f"Perintah kontrol sistem {payload.get('action')} berhasil dijalankan: {payload.get('message', 'Selesai')}."
         if tool_name == "take_screenshot" and isinstance(payload, dict):
             return f"Tangkapan layar berhasil disimpan ke {payload.get('saved_to', 'folder Pictures')}."
+        if tool_name in {"inspect_camera_feed", "inspect_camera", "see_camera"} and isinstance(payload, dict):
+            cam = payload.get("camera_name", "Kamera")
+            desc = payload.get("description", "Kondisi visual terpantau normal.")
+            return f"Laporan visual {cam}: {desc}"
         if tool_name == "run_terminal_command" and isinstance(payload, dict):
             return f"Perintah terminal selesai dijalankan:\n{payload.get('stdout') or payload.get('stderr') or 'Selesai.'}"
         return "Data telah diverifikasi dari sistem lokal, Sir."

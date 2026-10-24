@@ -110,6 +110,11 @@ export function displayToolName(toolName?: string | null): string {
     run_command: 'Eksekusi perintah terminal',
     take_screenshot: 'Tangkapan layar desktop',
     screenshot: 'Tangkapan layar desktop',
+    inspect_camera_feed: 'Analisis visual CCTV',
+    inspect_camera: 'Analisis visual CCTV',
+    see_camera: 'Analisis visual CCTV',
+    check_camera_visual: 'Analisis visual CCTV',
+    look_at_camera: 'Analisis visual CCTV',
   }
   if (map[toolName]) return map[toolName]
   return toolName.replace(/_/g, ' ')

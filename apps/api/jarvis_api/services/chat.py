@@ -345,12 +345,12 @@ class ChatService:
                 self._registry.execute(
                     call.name, call.arguments, context, allow_mutating=allow_mutating
                 ),
-                timeout=15.0,
+                timeout=25.0,
             )
         except TimeoutError:
-            logger.warning("Tool '%s' timeout (>5s)", call.name)
+            logger.warning("Tool '%s' timeout (>25s)", call.name)
             status = "timeout"
-            msg = f"Tool '{call.name}' melebihi batas waktu eksekusi (5 detik)"
+            msg = f"Tool '{call.name}' melebihi batas waktu eksekusi (25 detik)"
             content = json.dumps({"error": msg}, ensure_ascii=False)
             return (
                 {"role": "tool", "tool_call_id": call.id, "name": call.name, "content": content},
@@ -358,7 +358,7 @@ class ChatService:
                     name=call.name,
                     tool_name=call.name,
                     status=status,
-                    duration_ms=5000,
+                    duration_ms=25000,
                     parameters=call.arguments or {},
                     result=None,
                     result_summary=f"timeout: {msg}",

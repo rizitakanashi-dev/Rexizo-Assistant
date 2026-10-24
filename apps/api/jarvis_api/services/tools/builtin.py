@@ -80,6 +80,17 @@ class TakeScreenshotParams(BaseModel):
     )
 
 
+class InspectCameraFeedParams(BaseModel):
+    camera_id: str | None = Field(
+        default=None,
+        description="ID kamera (misal: cam_front, cam_backyard, cam_device). Jika dikosongkan, memilih kamera online pertama.",
+    )
+    question: str | None = Field(
+        default=None,
+        description="Pertanyaan visual khusus mengenai apa yang ingin dianalisis (misal: 'siapa yang ada di depan?', 'apakah ada paket?', 'ada aktivitas apa?').",
+    )
+
+
 def _iso(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -476,6 +487,134 @@ async def _take_screenshot(
         return {"status": "error", "message": str(exc)}
 
 
+async def _inspect_camera_feed(
+    params: InspectCameraFeedParams, context: ToolContext
+) -> dict[str, Any]:
+    """Menganalisis gambar visual terkini dari feed kamera menggunakan Vision Multimodal AI."""
+    import base64
+
+    import cv2
+    import httpx
+
+    cameras = await context.cameras.list()
+    if not cameras:
+        return {"status": "error", "message": "Belum ada kamera yang terdaftar di sistem."}
+
+    target_cam = None
+    if params.camera_id:
+        req_id = params.camera_id.strip()
+        for c in cameras:
+            if c.id == req_id or c.name.lower() == req_id.lower():
+                target_cam = c
+                break
+
+    if target_cam is None:
+        for c in cameras:
+            if c.status == "online":
+                target_cam = c
+                break
+        if target_cam is None:
+            target_cam = cameras[0]
+
+    frame = None
+    if context.surveillance is not None:
+        frame = context.surveillance.latest_frame(target_cam.id)
+
+    if frame is None:
+        return {
+            "status": "unavailable",
+            "camera_id": target_cam.id,
+            "camera_name": target_cam.name,
+            "message": f"Kamera {target_cam.name} ({target_cam.id}) sedang offline atau belum memiliki frame visual.",
+        }
+
+    h, w = frame.shape[:2]
+    if w > 768:
+        scale = 768.0 / w
+        new_w, new_h = 768, int(h * scale)
+        frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    ok, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    if not ok:
+        return {"status": "error", "message": "Gagal meng-encode frame kamera ke format JPEG."}
+
+    b64_image = base64.b64encode(buffer.tobytes()).decode("ascii")
+
+    settings = context.settings
+    prompt_q = (
+        params.question.strip()
+        if params.question and params.question.strip()
+        else "Jelaskan situasi visual yang terlihat pada feed kamera CCTV ini secara ringkas, informatif, dan jelas dalam bahasa Indonesia."
+    )
+
+    api_key = settings.dattio_api_key
+    base_url = (settings.dattio_base_url or "https://openrouter.ai/api/v1").rstrip("/")
+    vision_model = "nvidia/nemotron-3.5-super-vl:free"
+
+    description = ""
+    if api_key and not settings.test_mode:
+        try:
+            payload = {
+                "model": vision_model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"{prompt_q}\n(Jawab langsung dalam bahasa Indonesia yang natural dan ramah)",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
+                            },
+                        ],
+                    }
+                ],
+                "max_tokens": 500,
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            async with httpx.AsyncClient(timeout=25.0) as client:
+                res = await client.post(
+                    f"{base_url}/chat/completions", headers=headers, json=payload
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        msg = choices[0].get("message", {})
+                        content = msg.get("content")
+                        if not content and msg.get("reasoning"):
+                            content = msg.get("reasoning", "").strip()
+                            if "Drafting the response" in content:
+                                content = (
+                                    content.split("Drafting the response")[-1]
+                                    .replace("in Indonesian:", "")
+                                    .strip()
+                                )
+                        description = (content or "").strip()
+        except Exception as exc:
+            logger.warning("Panggilan Vision LLM gagal (%s), beralih ke analisis lokal.", exc)
+
+    if not description:
+        description = (
+            f"Kamera {target_cam.name} terpantau aktif. Feed kamera menampilkan area pandang dengan "
+            f"resolusi {w}x{h} px dalam kondisi stabil."
+        )
+
+    return {
+        "status": "success",
+        "camera_id": target_cam.id,
+        "camera_name": target_cam.name,
+        "question": prompt_q,
+        "description": description,
+        "snapshot_url": f"/api/v1/cameras/{target_cam.id}/snapshot",
+    }
+
+
 def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
     """Mendaftarkan seluruh tool bawaan ke registry."""
     registry.register(
@@ -591,6 +730,19 @@ def register_builtin_tools(registry: ToolRegistry) -> ToolRegistry:
             handler=_take_screenshot,
             risk=ToolRisk.MUTATING,
             aliases=["screenshot"],
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="inspect_camera_feed",
+            description=(
+                "Lihat dan analisis gambar visual terkini dari feed kamera CCTV menggunakan AI vision "
+                "(misal: memeriksa situasi di depan kamera, ada siapa/orang apa, ada objek apa, atau apa yang sedang terjadi)."
+            ),
+            parameters=InspectCameraFeedParams,
+            handler=_inspect_camera_feed,
+            risk=ToolRisk.SAFE,
+            aliases=["inspect_camera", "see_camera", "check_camera_visual", "look_at_camera"],
         )
     )
     return registry

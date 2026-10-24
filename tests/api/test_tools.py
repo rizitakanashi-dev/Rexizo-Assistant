@@ -126,3 +126,29 @@ async def test_duplicate_registration_is_rejected() -> None:
     registry = register_builtin_tools(ToolRegistry())
     with pytest.raises(ValueError):
         register_builtin_tools(registry)
+
+
+async def test_inspect_camera_feed_tool(session: AsyncSession, settings: Settings) -> None:
+    import numpy as np
+
+    class MockSurveillance:
+        def latest_frame(self, camera_id: str):
+            return np.zeros((200, 300, 3), dtype=np.uint8)
+
+    registry = register_builtin_tools(ToolRegistry())
+    ctx = _context(session, settings)
+    ctx.surveillance = MockSurveillance()
+
+    await CameraRepository(session).create(
+        camera_id="cam_yard", name="Backyard", rtsp_url="rtsp://mock/yard"
+    )
+    result = await registry.execute(
+        "inspect_camera_feed",
+        {"camera_id": "cam_yard", "question": "Ada siapa di halaman?"},
+        ctx,
+    )
+    assert result.payload["status"] == "success"
+    assert result.payload["camera_id"] == "cam_yard"
+    assert "description" in result.payload
+    assert "/api/v1/cameras/cam_yard/snapshot" in result.payload["snapshot_url"]
+
