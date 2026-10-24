@@ -23,8 +23,6 @@ import { PropsWithChildren, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { StatusStrip } from '../status/StatusStrip'
 import { MockBanner } from './MockBanner'
-import { ChatPanel } from '../chat/ChatPanel'
-import { useUiStore } from '@/store/ui'
 import { useSecurityAnnouncer } from '@/hooks/useSecurityAnnouncer'
 import { SecurityAnnouncerButton } from '../security/SecurityAnnouncerButton'
 import { SecurityAnnouncerBanner } from '../security/SecurityAnnouncerBanner'
@@ -33,6 +31,7 @@ const NAV_WIDTH = 260
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/', icon: <DashboardIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
+  { label: 'Asisten AI', path: '/chat', icon: <ChatIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
   { label: 'Kamera', path: '/cameras', icon: <VideocamIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
   { label: 'Events', path: '/events', icon: <TimelineIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
   { label: 'Pengaturan', path: '/settings', icon: <SettingsIcon fontSize="small" sx={{ color: '#0d0d0d' }} /> },
@@ -41,7 +40,6 @@ const NAV_ITEMS = [
 function SideNavContent({ onClose }: { onClose?: () => void }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { toggleChat } = useUiStore()
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#f9f9f9' }}>
@@ -132,8 +130,9 @@ function SideNavContent({ onClose }: { onClose?: () => void }) {
         }}
       >
         <ListItemButton
+          selected={location.pathname === '/chat'}
           onClick={() => {
-            toggleChat()
+            navigate('/chat')
             onClose?.()
           }}
           sx={{
@@ -141,7 +140,7 @@ function SideNavContent({ onClose }: { onClose?: () => void }) {
             px: '10px',
             py: '8px',
             border: '1px solid rgba(0, 0, 0, 0.1)',
-            bgcolor: '#ffffff',
+            bgcolor: location.pathname === '/chat' ? 'rgba(0, 0, 0, 0.06)' : '#ffffff',
             '&:hover': {
               bgcolor: 'rgba(0, 0, 0, 0.05)',
               borderColor: 'rgba(0, 0, 0, 0.2)',
@@ -153,8 +152,8 @@ function SideNavContent({ onClose }: { onClose?: () => void }) {
           </ListItemIcon>
           <ListItemText
             primary="Asisten REXIZO"
-            secondary="Buka chat"
-            primaryTypographyProps={{ fontSize: '13px', fontWeight: 500, color: '#0d0d0d' }}
+            secondary="Buka obrolan AI"
+            primaryTypographyProps={{ fontSize: '13px', fontWeight: location.pathname === '/chat' ? 600 : 500, color: '#0d0d0d' }}
             secondaryTypographyProps={{ fontSize: '12px', color: '#8f8f8f' }}
           />
         </ListItemButton>
@@ -164,11 +163,13 @@ function SideNavContent({ onClose }: { onClose?: () => void }) {
 }
 
 export function AppShell({ children }: PropsWithChildren) {
-  const { chatOpen, toggleChat } = useUiStore()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const securityAnnouncer = useSecurityAnnouncer()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isChatPage = location.pathname.startsWith('/chat')
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#ffffff' }}>
@@ -255,19 +256,18 @@ export function AppShell({ children }: PropsWithChildren) {
               onUpdateSettings={securityAnnouncer.updateSettings}
               onTestAlert={securityAnnouncer.testAlert}
             />
-            <Tooltip title="Buka Asisten REXIZO">
+            <Tooltip title="Buka Asisten AI">
               <IconButton
                 size="small"
-                onClick={toggleChat}
+                onClick={() => navigate('/chat')}
                 sx={{
-                  color: '#0d0d0d',
+                  color: isChatPage ? '#ffffff' : '#0d0d0d',
                   p: '6px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(0, 0, 0, 0.1)',
-                  bgcolor: '#ffffff',
+                  border: isChatPage ? '1px solid #0d0d0d' : '1px solid rgba(0, 0, 0, 0.1)',
+                  bgcolor: isChatPage ? '#0d0d0d' : '#ffffff',
                   '&:hover': {
-                    bgcolor: 'rgba(0, 0, 0, 0.05)',
-                    borderColor: 'rgba(0, 0, 0, 0.2)',
+                    bgcolor: isChatPage ? '#222222' : 'rgba(0, 0, 0, 0.05)',
                   },
                 }}
               >
@@ -277,39 +277,26 @@ export function AppShell({ children }: PropsWithChildren) {
           </Box>
         </Box>
 
-        <MockBanner />
+        {!isChatPage && <MockBanner />}
 
         {/* Page body content */}
         <Box
           component="main"
           sx={{
             flex: 1,
-            p: { xs: 2, md: 3 },
-            maxWidth: '1200px',
+            p: isChatPage ? 0 : { xs: 2, md: 3 },
+            maxWidth: isChatPage ? 'none' : '1200px',
             width: '100%',
-            mx: 'auto',
+            mx: isChatPage ? 0 : 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            height: isChatPage ? 'calc(100vh - 52px)' : 'auto',
+            overflow: isChatPage ? 'hidden' : 'visible',
           }}
         >
           {children}
         </Box>
       </Box>
-
-      {/* Chat drawer */}
-      <Drawer
-        anchor="right"
-        open={chatOpen}
-        onClose={toggleChat}
-        PaperProps={{
-          sx: {
-            width: { xs: '100%', sm: 440 },
-            borderLeft: '1px solid rgba(0, 0, 0, 0.1)',
-            boxShadow: 'none',
-            bgcolor: '#ffffff',
-          },
-        }}
-      >
-        <ChatPanel />
-      </Drawer>
     </Box>
   )
 }
