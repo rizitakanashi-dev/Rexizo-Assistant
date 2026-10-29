@@ -1,0 +1,25 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Rexizo Assistant
+GenericName=AI Assistant & Smart CCTV
+Comment=Asisten AI Multimodal Tachibana Nozomi & Smart CCTV Surveillance
+Exec="/home/Rizi/Projects/jarvis-assistant/scripts/launch-rexizo.sh"
+Icon=rexizo
+Terminal=false
+Categories=Utility;AudioVideo;
+StartupNotify=true
+Keywords=rexizo;assistant;cctv;surveillance;nozomi;jarvis;ai;
+Actions=Stop;Restart;Status;
+
+[Desktop Action Stop]
+Name=Hentikan Layanan Rexizo
+Exec="/home/Rizi/Projects/jarvis-assistant/scripts/rexizo.sh" stop
+
+[Desktop Action Restart]
+Name=Restart Layanan Rexizo
+Exec="/home/Rizi/Projects/jarvis-assistant/scripts/rexizo.sh" restart
+
+[Desktop Action Status]
+Name=Periksa Status Rexizo
+Exec="/home/Rizi/Projects/jarvis-assistant/scripts/rexizo.sh" status

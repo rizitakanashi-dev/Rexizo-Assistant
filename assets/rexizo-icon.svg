@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16" />
+      <stop offset="50%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Nozomi Pink Gradient -->
+    <linearGradient id="nozomiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f472b6" />
+      <stop offset="50%" stop-color="#ec4899" />
+      <stop offset="100%" stop-color="#db2777" />
+    </linearGradient>
+
+    <!-- Butler Cyan Gradient -->
+    <linearGradient id="hudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="haloGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Base Squircle -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="#312e81" stroke-width="6" />
+
+  <!-- Holographic Radar Grid Background Lines -->
+  <g opacity="0.18" stroke="#38bdf8" stroke-width="1.5">
+    <circle cx="256" cy="256" r="190" fill="none" stroke-dasharray="6 8" />
+    <circle cx="256" cy="256" r="140" fill="none" />
+    <circle cx="256" cy="256" r="90" fill="none" stroke-dasharray="4 6" />
+    <line x1="66" y1="256" x2="446" y2="256" />
+    <line x1="256" y1="66" x2="256" y2="446" />
+  </g>
+
+  <!-- Nozomi Halo Wings (Blue Archive Stylized) -->
+  <g filter="url(#haloGlow)" opacity="0.9">
+    <!-- Outer Halo Ring -->
+    <ellipse cx="256" cy="180" rx="145" ry="32" fill="none" stroke="url(#nozomiGrad)" stroke-width="7" />
+    <!-- Winged Accents -->
+    <path d="M 115 180 Q 80 155 125 140 Q 155 160 145 178 Z" fill="url(#nozomiGrad)" />
+    <path d="M 397 180 Q 432 155 387 140 Q 357 160 367 178 Z" fill="url(#nozomiGrad)" />
+    <!-- Top Crown Spike -->
+    <polygon points="256,110 268,145 256,155 244,145" fill="url(#nozomiGrad)" />
+    <circle cx="256" cy="98" r="7" fill="#fbcfe8" />
+  </g>
+
+  <!-- CCTV Lens Outer Ring (Butler Arc Reactor) -->
+  <circle cx="256" cy="285" r="105" fill="#0b1120" stroke="url(#hudGrad)" stroke-width="6" filter="url(#glow)" />
+  <circle cx="256" cy="285" r="86" fill="none" stroke="#0ea5e9" stroke-width="2.5" stroke-dasharray="14 10" />
+
+  <!-- CCTV Camera Lens Inner Iris -->
+  <circle cx="256" cy="285" r="66" fill="#030712" stroke="#38bdf8" stroke-width="3" />
+  <circle cx="256" cy="285" r="44" fill="#0f172a" />
+  <circle cx="256" cy="285" r="24" fill="#38bdf8" opacity="0.75" />
+
+  <!-- Lens Glass Reflection Glare -->
+  <ellipse cx="240" cy="268" rx="16" ry="8" transform="rotate(-30 240 268)" fill="#ffffff" opacity="0.65" />
+  <circle cx="268" cy="298" r="5" fill="#ffffff" opacity="0.4" />
+
+  <!-- Audio Waveform Bars (Reactivity indicator) -->
+  <g fill="url(#nozomiGrad)" opacity="0.85">
+    <rect x="216" y="405" width="8" height="28" rx="4" />
+    <rect x="232" y="395" width="8" height="48" rx="4" />
+    <rect x="248" y="385" width="8" height="68" rx="4" />
+    <rect x="264" y="392" width="8" height="54" rx="4" />
+    <rect x="280" y="402" width="8" height="34" rx="4" />
+  </g>
+
+  <!-- Badge Monogram "R" (Rexizo) -->
+  <text x="256" y="293" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" opacity="0.95">
+    R
+  </text>
+</svg>
